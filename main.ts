@@ -1,44 +1,6 @@
-import { App, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, TFolder, SuggestModal } from 'obsidian';
-
-// Types
-type Action = 'long' | 'short';
-type Side = 'in' | 'out';
-
-interface Fill {
-	side: Side;
-	t: string; // ISO UTC
-	base: number;
-	quote: number;
-	price: number;
-	note?: string;
-	txs?: string[];
-}
-
-interface Metrics {
-	status: 'open' | 'closed';
-	position: number | null;
-	avg_entry: number | null;
-	avg_exit: number | null;
-	realized_pnl: number | null;
-	r_multiple: number | null;
-	win: boolean | null;
-	last_fill_at?: string | null;
-	computed_at?: string;
-}
-
-interface TradeFrontmatter {
-	id: string;
-	schema_version: number; // 2
-	timestamp: string; // ISO
-	pair: string; // e.g., HYPE/USDT
-	action: Action;
-	account?: string;
-	quote?: string;
-	initial_stop?: number;
-	closed_at?: string;
-	fills?: Fill[];
-	metrics?: Metrics;
-}
+import { App, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, TFolder, SuggestModal, TextComponent } from 'obsidian';
+import { pad, toIsoUtc, toLiteUtc, parseNum, parsePair, ensureFolder, toUtcDateFromInput, isTradeFile, buildFill, expectedQuoteSign, computeMetrics } from './helpers';
+import { Action, Side, TradeFrontmatter } from './schema';
 
 interface AceTradingSettings {
 	tradesRoot: string;
@@ -52,96 +14,60 @@ const DEFAULT_SETTINGS: AceTradingSettings = {
 	bodyTemplatePath: 'utils/templates/trading/trade-body.md'
 };
 
-// Helpers
-const pad = (n: number) => String(n).padStart(2, '0');
-const toIsoUtc = (d: Date) => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:00.000Z`;
-const toLiteUtc = (d: Date) => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
-const parseNum = (s?: string) => {
-	const n = Number(String(s ?? '').replace(/[ ,]/g, ''));
-	return Number.isFinite(n) ? n : NaN;
-};
-const round = (x: number | null | undefined, places = 10) => {
-	if (x == null || !Number.isFinite(x)) return null;
-	const p = Math.pow(10, places);
-	return Math.round(x * p) / p;
-};
-const parsePair = (input?: string) => {
-	const raw = (input ?? '').toUpperCase().replace(/\s+/g, '').trim();
-	if (!raw) return { base: '', quote: '' };
-	const parts = raw.split(/[/:-]/);
-	if (parts.length >= 2) return { base: parts[0], quote: parts[1] };
-	if (raw.endsWith('USDT')) return { base: raw.replace(/USDT$/, ''), quote: 'USDT' };
-	return { base: raw, quote: 'USDT' };
-};
-const ensureFolder = async (app: App, path: string) => {
-	if (app.vault.getAbstractFileByPath(path)) return;
-	const parts = path.split('/');
-	let accum = '';
-	for (const part of parts) {
-		accum = accum ? `${accum}/${part}` : part;
-		if (!app.vault.getAbstractFileByPath(accum)) await app.vault.createFolder(accum);
-	}
-};
-const toUtcDateFromInput = (input: string | undefined, fallbackDate: Date | null = null) => {
-	if (!input || !input.trim()) return fallbackDate;
-	const s = input.trim().replace(/\s+UTC$/i, '');
-	let m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})$/);
-	if (m) return new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:00Z`);
-	m = s.match(/^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})$/);
-	if (m) return new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:00Z`);
-	const d = new Date(s);
-	return isNaN(d.getTime()) ? fallbackDate : d;
-};
-const isTradeFile = (f: TFile | null, root?: string) => !!(f && f.basename?.startsWith('T-') && (!root || (f.path && f.path.startsWith(root + '/'))));
+const pickFromModal = <T>(picker: SuggestModal<T>): Promise<T | null> =>
+	new Promise<T | null>((resolve) => {
+		let done = false;
+		const finish = (value: T | null) => {
+			if (done) return;
+			done = true;
+			resolve(value);
+		};
+		const origClose = picker.onClose.bind(picker);
+		picker.onClose = () => {
+			finish(null);
+			origClose();
+		};
+		(picker as SuggestModal<T> & { onChoose?: (value: T) => void }).onChoose = finish;
+		picker.open();
+});
 
-const pickTrade = async (app: App, rootPath: string) => {
-	const active = app.workspace.getActiveFile();
-	if (isTradeFile(active, rootPath)) return active;
-	return await new Promise<TFile | null>(res => {
-		let done = false; const finish = (v: TFile | null) => { if (done) return; done = true; res(v); };
-		const p = new TradeFilePicker(app, rootPath);
-		p.onChoose = (f) => finish(f);
-		const origClose = p.onClose.bind(p);
-		p.onClose = () => { finish(null); origClose(); };
-		p.open();
-	});
-};
-const expectedQuoteSign = (dir: number, side: Side) => (side === 'in' ? -dir : dir);
-const buildFill = (opts: { dir: number; side: Side; amount: number; price?: number | null; quote?: number | null; when?: Date; note?: string; txs?: string[] }): Fill => {
-	const { dir, side, amount } = opts;
-	const when = opts.when ?? new Date();
-	const baseAbs = Math.abs(Number(amount) || 0);
-	const baseSign = dir * (side === 'in' ? 1 : -1);
-	const base = round(baseSign * baseAbs) ?? 0;
-	let quote = opts.quote != null ? Number(opts.quote) : null;
-	let price = opts.price != null ? Number(opts.price) : null;
-	if (price != null && price > 0) quote = round(-(base) * price);
-	else if (quote != null && quote !== 0) price = round(Math.abs(quote) / Math.abs(base || 1));
-	const fill: Fill = { side, t: toIsoUtc(when), base, quote: round(quote) ?? 0, price: round(price) ?? 0 };
-	if (opts.note) fill.note = opts.note; if (opts.txs?.length) fill.txs = opts.txs;
-	return fill;
-};
-const computeMetrics = (fm: Partial<TradeFrontmatter>): Metrics => {
-	const fills = Array.isArray(fm?.fills) ? fm.fills as Fill[] : [];
-	if (!fills.length) return { status: 'open', position: null, avg_entry: null, avg_exit: null, realized_pnl: null, r_multiple: null, win: null };
-	let inB = 0, inQ = 0, outB = 0, outQ = 0; for (const f of fills) { const s = (f?.side || 'in'); const b = Number(f?.base || 0), q = Number(f?.quote || 0); if (s === 'in') { inB += b; inQ += q; } else { outB += b; outQ += q; } }
-	const abs = Math.abs; const avgEntry = inB ? abs(inQ) / abs(inB) : null; const avgExit = outB ? abs(outQ) / abs(outB) : null; const position = round(inB + outB);
-	const exitedUnits = abs(outB);
-	let realized: number | null = null;
-	if (exitedUnits && inB) {
-		const avgEntryVal = avgEntry as number;
-		realized = round(abs(outQ) - (avgEntryVal * exitedUnits));
-	}
-	const status: Metrics['status'] = (position === 0 || !!fm.closed_at) ? 'closed' : 'open';
-	let rMultiple: number | null = null; if (fm.initial_stop != null && avgEntry != null && exitedUnits) { const rpu = abs(avgEntry - Number(fm.initial_stop)); if (rpu > 0) rMultiple = round((realized ?? 0) / (rpu * exitedUnits)); }
-	const lastFillAt = fills.reduce((mx, f) => { const t = Date.parse(f.t || ''); return isNaN(t) ? mx : Math.max(mx, t); }, 0);
-	const win = realized != null ? realized > 0 : null;
-	return { status, position: position ?? null, avg_entry: round(avgEntry), avg_exit: round(avgExit), realized_pnl: realized, r_multiple: rMultiple, win, last_fill_at: lastFillAt ? new Date(lastFillAt).toISOString() : null, computed_at: new Date().toISOString() };
-};
+const pickTrade = (app: App, rootPath: string) =>
+	pickFromModal(new TradeFilePicker(app, { rootPath }));
+
+const pickOpenTrade = (app: App, rootPath: string) =>
+	pickFromModal(new TradeFilePicker(app, { rootPath, filter: openTradesOnlyFilter(app) }));
+
+const openTradesOnlyFilter = (app: App) => (file: TFile) => app.metadataCache.getFileCache(file)?.frontmatter?.closed_at === undefined;
+
+type TradeFilePickerOptions = {
+	rootPath?: string,
+	filter?: (file: TFile) => boolean;
+}
+
 class TradeFilePicker extends SuggestModal<TFile> {
 	files: TFile[];
 	onChoose?: (f: TFile) => void;
-	constructor(app: App, rootPath?: string) { super(app); this.files = app.vault.getMarkdownFiles().filter(ff => isTradeFile(ff, rootPath)).sort((a, b) => b.stat.mtime - a.stat.mtime); }
+	constructor(app: App, opts: TradeFilePickerOptions = {}) {
+		super(app);
+		const { rootPath, filter } = opts;
+
+		const pass = filter ?? (() => true);
+		this.files = app.vault
+			.getMarkdownFiles()
+			.filter(ff => isTradeFile(ff, rootPath))
+			.filter(pass)
+			.sort((a, b) => b.stat.mtime - a.stat.mtime);
+	}
+	getSuggestions(query: string): TFile[] { const q = query.toLowerCase(); return this.files.filter(f => f.path.toLowerCase().includes(q)).slice(0, 200); }
+	renderSuggestion(value: TFile, el: HTMLElement) { el.setText(value.path); }
+	onChooseSuggestion(item: TFile) { this.onChoose?.(item); }
+}
+
+
+class FilePicker extends SuggestModal<TFile> {
+	files: TFile[];
+	onChoose?: (f: TFile) => void;
+	constructor(app: App, rootPath?: string) { super(app); this.files = app.vault.getMarkdownFiles().sort((a, b) => b.stat.mtime - a.stat.mtime); }
 	getSuggestions(query: string): TFile[] { const q = query.toLowerCase(); return this.files.filter(f => f.path.toLowerCase().includes(q)).slice(0, 200); }
 	renderSuggestion(value: TFile, el: HTMLElement) { el.setText(value.path); }
 	onChooseSuggestion(item: TFile) { this.onChoose?.(item); }
@@ -188,10 +114,76 @@ class AceTradingSettingsTab extends PluginSettingTab {
 	plugin: AceTradingPlugin;
 	constructor(app: App, plugin: AceTradingPlugin) { super(app, plugin); this.plugin = plugin; }
 	display(): void {
-		const { containerEl } = this; containerEl.empty(); containerEl.createEl('h3', { text: `${this.plugin.manifest.name} Settings` });
-		new Setting(containerEl).setName('Trades Root Folder').setDesc('Base folder for trades; year subfolders created automatically').addText(t => t.setValue(this.plugin.settings.tradesRoot).onChange(async (v) => { this.plugin.settings.tradesRoot = v; await this.plugin.saveSettings(); }));
-		new Setting(containerEl).setName('Filename Pattern').setDesc('Vars: ${YYYY}${MM}${DD}${HH}${mm}, ${PAIR}, ${ACTION}').addText(t => t.setValue(this.plugin.settings.filenamePattern).onChange(async (v) => { this.plugin.settings.filenamePattern = v; await this.plugin.saveSettings(); }));
-		new Setting(containerEl).setName('Trade Body Template Path').setDesc('Path to Markdown template for note body; frontmatter is injected by plugin').addText(t => t.setValue(this.plugin.settings.bodyTemplatePath).onChange(async (v) => { this.plugin.settings.bodyTemplatePath = v; await this.plugin.saveSettings(); }));
+		const { containerEl } = this;
+		containerEl.empty();
+		containerEl.createEl('h3', { text: `${this.plugin.manifest.name} Settings` });
+
+		const rootSetting = new Setting(containerEl)
+			.setName('Trades Root Folder')
+			.setDesc('Base folder for trades; year subfolders created automatically');
+		let rootInput: TextComponent | null = null;
+		rootSetting.addText(t => {
+			rootInput = t;
+			t.setPlaceholder('Select folder…');
+			t.setValue(this.plugin.settings.tradesRoot);
+			t.onChange(async (v) => {
+				this.plugin.settings.tradesRoot = v;
+				await this.plugin.saveSettings();
+			});
+		});
+		rootSetting.addButton(btn => {
+			btn.setButtonText('Select');
+			btn.setTooltip('Choose a folder from the vault');
+			btn.onClick(() => {
+				const picker = new FolderPicker(this.app);
+				picker.setPlaceholder('Select trades root folder…');
+				picker.onChoose = async (folder: TFolder) => {
+					const selectedPath = folder.path.replace(/\/+$/, '');
+					if (!selectedPath) {
+						new Notice('Please choose a non-root folder for trades.');
+						return;
+					}
+					this.plugin.settings.tradesRoot = selectedPath;
+					rootInput?.setValue(selectedPath);
+					await this.plugin.saveSettings();
+				};
+				picker.open();
+			});
+		});
+
+		new Setting(containerEl)
+			.setName('Filename Pattern')
+			.setDesc('Vars: ${YYYY}${MM}${DD}${HH}${mm}, ${PAIR}, ${ACTION}')
+			.addText(t => t.setValue(this.plugin.settings.filenamePattern).onChange(async (v) => { this.plugin.settings.filenamePattern = v; await this.plugin.saveSettings(); }));
+
+		const templateSetting = new Setting(containerEl)
+			.setName('Trade Body Template Path')
+			.setDesc('Path to Markdown template for note body; frontmatter is injected by plugin');
+		let templateInput: TextComponent | null = null;
+		templateSetting.addText(t => {
+			templateInput = t;
+			t.setPlaceholder('Select file…');
+			t.setValue(this.plugin.settings.bodyTemplatePath);
+			t.onChange(async (v) => {
+				this.plugin.settings.bodyTemplatePath = v;
+				await this.plugin.saveSettings();
+			});
+		});
+		templateSetting.addButton(btn => {
+			btn.setButtonText('Select');
+			btn.setTooltip('Choose a Markdown file from the vault');
+			btn.onClick(() => {
+				const picker = new FilePicker(this.app);
+				picker.setPlaceholder('Select trade template…');
+				picker.onChoose = async (file: TFile) => {
+					const selectedPath = file.path;
+					this.plugin.settings.bodyTemplatePath = selectedPath;
+					templateInput?.setValue(selectedPath);
+					await this.plugin.saveSettings();
+				};
+				picker.open();
+			});
+		});
 	}
 }
 
@@ -273,9 +265,13 @@ export default class AceTradingPlugin extends Plugin {
 					`    price: ${firstFill.price}`,
 					'---'
 				);
+
 				let body = '';
-				try { body = await this.app.vault.adapter.read(this.settings.bodyTemplatePath); } catch { }
-				if (!body) body = this.defaultBody();
+				try {
+					body = await this.app.vault.adapter.read(this.settings.bodyTemplatePath);
+				} catch {
+					new Notice(`Couldn't find trade template at ${this.settings.bodyTemplatePath}`, 0);
+				}
 				const content = `${fmLines.join('\n')}\n\n${body}`;
 				const file = await this.app.vault.create(filePath, content);
 				await this.persistMetrics(file);
@@ -285,18 +281,8 @@ export default class AceTradingPlugin extends Plugin {
 		}).open();
 	}
 
-	defaultBody(): string {
-		const label = this.manifest?.name || 'Plugin Name Undefined!';
-		return [
-			'```button', 'name Add Fill', 'type command', `action ${label}: Add Trade Fill`, '```', '',
-			'```button', 'name Close Trade', 'type command', `action ${label}: Close Trade`, '```', '',
-			'```dataviewjs', 'await dv.view("utils/dataview/fills", { render: "metrics" })', '```', '',
-			'# Fills', '', '```dataviewjs', 'await dv.view("utils/dataview/fills", { render: "fills" })', '```', '', '# Review', '-'
-		].join('\n');
-	}
-
 	async addFill() {
-		const file = await pickTrade(this.app, this.settings.tradesRoot); if (!file) return;
+		const file = await pickOpenTrade(this.app, this.settings.tradesRoot); if (!file) return;
 		const page = this.app.metadataCache.getFileCache(file); const action = String(page?.frontmatter?.action || 'long').toLowerCase() as Action; const dir = action === 'short' ? -1 : 1;
 		const fields = [
 			{ id: 'side', label: 'Side (in/out)', default: 'in' },
@@ -321,7 +307,7 @@ export default class AceTradingPlugin extends Plugin {
 	}
 
 	async closeTrade() {
-		const file = await pickTrade(this.app, this.settings.tradesRoot); if (!file) return;
+		const file = await pickOpenTrade(this.app, this.settings.tradesRoot); if (!file) return;
 		const page = this.app.metadataCache.getFileCache(file); const fm = page?.frontmatter as Partial<TradeFrontmatter> | undefined;
 		const fills = Array.isArray(fm?.fills) ? fm!.fills! : [];
 		const pos = fills.reduce((acc, f: any) => acc + (Number(f.base) || 0), 0);
