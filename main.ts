@@ -24,18 +24,24 @@ const pickFromModal = <T>(picker: SuggestModal<T>): Promise<T | null> =>
 		};
 		const origClose = picker.onClose.bind(picker);
 		picker.onClose = () => {
-			finish(null);
 			origClose();
+			setTimeout(() => finish(null), 0);
 		};
 		(picker as SuggestModal<T> & { onChoose?: (value: T) => void }).onChoose = finish;
 		picker.open();
-});
+	});
 
-const pickTrade = (app: App, rootPath: string) =>
-	pickFromModal(new TradeFilePicker(app, { rootPath }));
+const pickTrade = async (app: App, rootPath: string) => {
+	const active = app.workspace.getActiveFile();
+	if (isTradeFile(active, rootPath)) return active;
+	return await pickFromModal(new TradeFilePicker(app, { rootPath }))
+};
 
-const pickOpenTrade = (app: App, rootPath: string) =>
-	pickFromModal(new TradeFilePicker(app, { rootPath, filter: openTradesOnlyFilter(app) }));
+const pickOpenTrade = async (app: App, rootPath: string) => {
+	const active = app.workspace.getActiveFile();
+	if (isTradeFile(active, rootPath)) return active;
+	return await pickFromModal(new TradeFilePicker(app, { rootPath, filter: openTradesOnlyFilter(app) }))
+};
 
 const openTradesOnlyFilter = (app: App) => (file: TFile) => app.metadataCache.getFileCache(file)?.frontmatter?.closed_at === undefined;
 
@@ -282,7 +288,8 @@ export default class AceTradingPlugin extends Plugin {
 	}
 
 	async addFill() {
-		const file = await pickOpenTrade(this.app, this.settings.tradesRoot); if (!file) return;
+		const file = await pickOpenTrade(this.app, this.settings.tradesRoot);
+		if (!file) return;
 		const page = this.app.metadataCache.getFileCache(file); const action = String(page?.frontmatter?.action || 'long').toLowerCase() as Action; const dir = action === 'short' ? -1 : 1;
 		const fields = [
 			{ id: 'side', label: 'Side (in/out)', default: 'in' },
