@@ -249,3 +249,77 @@ this.registerInterval(window.setInterval(() => { /* ... */ }, 1000));
 - Developer policies: https://docs.obsidian.md/Developer+policies
 - Plugin guidelines: https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines
 - Style guide: https://help.obsidian.md/style-guide
+
+## Intent of Code
+This plugin exists to keep numbers accurate and automatic in trade notes, to make dashboards fast and trustworthy, and to free your daily journals for clarity, intent, and learning—where your edge is built.
+### Purpose
+
+  - Transform trading notes into the single source of truth, reduce manual bookkeeping, and make daily journaling a thinking tool.
+  - Capture atomic fills in a stable schema; compute and persist metrics automatically; render dashboards from persisted data.
+
+### Context
+
+  - Vault structure follows ACE (Atlas, Calendar, Efforts). Trading lives in Efforts/Ongoing/Trading/.
+  - Manual YAML (“status”, “win”, “avg_exit”) and table parsing were brittle and tedious—especially on mobile.
+  - We moved fills to frontmatter (schema v2), derived metrics from fills, and automated persistence via scripts and now a plugin.
+
+### Core Model
+
+  - Single source of truth: fills[] in frontmatter (each fill = { side, t, base, quote, price, note?, txs? }).
+  - Derived metrics (persisted): metrics object in frontmatter { status, position, avg_entry, avg_exit, realized_pnl, r_multiple, win, last_fill_at, computed_at }.
+  - Design principle: no duplicated numbers; dashboards and notes read persisted metrics; daily journals focus on intent/learning.
+
+### How We Got Here
+
+  - Initial state: per-trade tables + manual fields (status, win, averages).
+  - Step 1: Move to YAML fills[]; compute metrics in DataviewJS for display-only.
+  - Step 2: Add QuickAdd user scripts (New Trade v2, Add Fill, Close Trade) + Buttons for mobile; compute metrics on write.
+  - Step 3: DRY shared logic (common.js, trade-metrics.js), add recompute (single/bulk), and have dashboard read persisted metrics (no dv.view return hacks).
+  - Step 4: Draft a minimal Obsidian plugin; then port to TypeScript with settings for root, filename pattern, and body template.
+
+### What The Plugin Does
+
+  - Commands:
+      - New Trade: creates a trade note with v2 schema and an initial fill; appends a body via template; persists metrics.
+      - Add Trade Fill: appends an in/out fill with sign guardrails; persists metrics.
+      - Close Trade: flattens position via out fill (price or quote mode with guardrails), sets closed_at, persists metrics.
+      - Recompute Trade Metrics (one): updates metrics from fills in the current/picked trade.
+      - Bulk Recompute Trade Metrics (folder): recomputes for all schema v2 trades in a folder (e.g., year).
+  - Settings:
+      - tradesRoot (default Efforts/Ongoing/Trading/Trades)
+      - filenamePattern (e.g., T-${YYYY}${MM}${DD}-${HH}${mm}-${PAIR}-${ACTION})
+      - bodyTemplatePath (default utils/templates/trading/trade-body.md)
+  - Defaults:
+      - If the body template is missing, new trades include two Buttons (Add Fill/Close Trade) and Dataview views for metrics/fills rendering.
+
+### Why Persist Metrics
+
+  - Reliable dashboards without relying on dv.view return values.
+  - Mobile/read-only contexts are fast; no recompute needed to browse.
+  - Stale detection: dashboard flags rows stale if a fill is newer than metrics.last_fill_at.
+
+### Daily Journals’ Role
+
+  - Not for bookkeeping. Capture:
+      - Intent (bias, if–then, invalidations, risk for the day)
+      - Market context and plays (triggers, exits, position sizing)
+      - During-session notes (observations vs plan)
+      - Post-session reflections (top 3, lessons, process changes)
+  - Link to trades via Dataview; let trade notes carry the numbers.
+
+### Key Design Choices
+
+  - Schema v2 in frontmatter; tables are optional, not canonical.
+  - Guardrails normalize quote signs per action/side; time prompts prefilled for quick edits.
+  - Buttons and Commands provide mobile-friendly input.
+  - Dashboard reads persisted metrics; DataviewJS renders per-note metrics/tables for readability.
+
+###  Future Enhancements
+
+  - Validation UI or schema customization (user-defined extra frontmatter).
+  - Event-driven recompute on save (opt-in), lint/compliance checks, richer settings.
+  - Modularize TS source further (metrics/fills/utils) and add light tests.
+  - “Flatten now” command (one-tap close), and richer analytics/filters on dashboard.
+
+
+
