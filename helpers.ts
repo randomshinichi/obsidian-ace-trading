@@ -67,7 +67,9 @@ export const computeMetrics = (fm: Partial<TradeFrontmatter>): Metrics => {
     let realized: number | null = null;
     if (exitedUnits && inB) {
         const avgEntryVal = avgEntry as number;
-        realized = round(abs(outQ) - (avgEntryVal * exitedUnits));
+        const directionalDiff = abs(outQ) - (avgEntryVal * exitedUnits);
+        const dir = fm.action === 'short' ? -1 : fm.action === 'long' ? 1 : (inB < 0 ? -1 : 1);
+        realized = round(dir * directionalDiff);
     }
     const status: Metrics['status'] = (position === 0 || !!fm.closed_at) ? 'closed' : 'open';
     let rMultiple: number | null = null; if (fm.initial_stop != null && avgEntry != null && exitedUnits) { const rpu = abs(avgEntry - Number(fm.initial_stop)); if (rpu > 0) rMultiple = round((realized ?? 0) / (rpu * exitedUnits)); }
