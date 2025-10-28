@@ -29,6 +29,8 @@ export interface TradeFrontmatter {
     timestamp: string; // ISO
     pair: string; // e.g., HYPE/USDT
     action: Action;
+    lesson: string;
+    tags: string[];
     account?: string;
     quote?: string;
     initial_stop?: number;

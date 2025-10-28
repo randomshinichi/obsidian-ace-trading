@@ -1,4 +1,4 @@
-import { App, TFile } from 'obsidian';
+import type { App, TFile } from 'obsidian';
 import { Metrics, Fill, Side, TradeFrontmatter } from './schema';
 // Helpers
 export const pad = (n: number) => String(n).padStart(2, '0');

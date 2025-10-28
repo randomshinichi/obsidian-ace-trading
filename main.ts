@@ -1,6 +1,32 @@
-import { App, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, TFolder, SuggestModal, TextComponent } from 'obsidian';
-import { pad, toIsoUtc, toLiteUtc, parseNum, parsePair, ensureFolder, toUtcDateFromInput, isTradeFile, buildFill, expectedQuoteSign, computeMetrics } from './helpers';
-import { Action, Side, TradeFrontmatter } from './schema';
+import {
+	App,
+	Modal,
+	Notice,
+	Plugin,
+	PluginSettingTab,
+	Setting,
+	TFile,
+	TFolder,
+	SuggestModal,
+	TextComponent,
+	stringifyYaml,
+	WorkspaceLeaf,
+} from 'obsidian';
+import {
+	pad,
+	toIsoUtc,
+	toLiteUtc,
+	parseNum,
+	parsePair,
+	ensureFolder,
+	toUtcDateFromInput,
+	isTradeFile,
+	buildFill,
+	expectedQuoteSign,
+	computeMetrics,
+} from './helpers';
+import { Action, Side, TradeFrontmatter, Fill } from './schema';
+import { TradePaneView, VIEW_TYPE_TRADE } from './trade-pane';
 
 interface AceTradingSettings {
 	tradesRoot: string;
@@ -200,14 +226,79 @@ export default class AceTradingPlugin extends Plugin {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
 		this.addSettingTab(new AceTradingSettingsTab(this.app, this));
 
+		this.registerView(
+			VIEW_TYPE_TRADE,
+			(leaf: WorkspaceLeaf) => new TradePaneView(leaf)
+		);
+
+		this.addCommand({
+			id: 'ace-open-trade-pane',
+			name: 'Show Trade Pane',
+			callback: () => this.activateTradePane(),
+		});
+
 		this.addCommand({ id: 'ace-new-trade', name: 'New Trade', callback: () => this.newTrade() });
 		this.addCommand({ id: 'ace-add-fill', name: 'Add Trade Fill', callback: () => this.addFill() });
 		this.addCommand({ id: 'ace-close-trade', name: 'Close Trade', callback: () => this.closeTrade() });
 		this.addCommand({ id: 'ace-recompute-trade', name: 'Recompute Trade Metrics (current or pick)', callback: () => this.recomputeOne() });
 		this.addCommand({ id: 'ace-bulk-recompute', name: 'Bulk Recompute Trade Metrics (folder/year)', callback: () => this.bulkRecompute() });
+
+		this.registerEvent(
+			this.app.workspace.on('active-leaf-change', () => {
+				this.syncTradePane();
+			})
+		);
+		this.registerEvent(
+			this.app.metadataCache.on('changed', (file) => {
+				const leaf = this.getTradePaneLeaf(false);
+				if (!leaf) return;
+				const view = leaf.view;
+				if (view instanceof TradePaneView && view.getFile()?.path === file.path) {
+					view.setFile(file);
+				}
+			})
+		);
+
+		this.app.workspace.onLayoutReady(() => {
+			this.activateTradePane();
+			this.syncTradePane();
+		});
 	}
-	onunload() { }
+	onunload() {
+		this.app.workspace.getLeavesOfType(VIEW_TYPE_TRADE).forEach(leaf => this.app.workspace.detachLeavesOfType(VIEW_TYPE_TRADE));
+	}
 	async saveSettings() { await this.saveData(this.settings); }
+
+	private getTradePaneLeaf(create: boolean): WorkspaceLeaf | null {
+		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_TRADE);
+		if (leaves.length > 0) return leaves[0];
+		if (!create) return null;
+		return this.app.workspace.getRightLeaf(false);
+	}
+
+	private async activateTradePane(): Promise<void> {
+		let leaf = this.getTradePaneLeaf(false);
+		if (!leaf) {
+			leaf = this.getTradePaneLeaf(true);
+			if (!leaf) return;
+			await leaf.setViewState({ type: VIEW_TYPE_TRADE, active: true });
+		}
+		this.app.workspace.revealLeaf(leaf);
+	}
+
+	private syncTradePane(): void {
+		const leaf = this.getTradePaneLeaf(false);
+		if (!leaf) return;
+		const view = leaf.view;
+		if (!(view instanceof TradePaneView)) return;
+
+		const activeFile = this.app.workspace.getActiveFile();
+		if (isTradeFile(activeFile, this.settings.tradesRoot)) {
+			view.setFile(activeFile);
+		} else {
+			view.setFile(null);
+		}
+	}
 
 	async newTrade() {
 		const d = new Date();
@@ -217,6 +308,7 @@ export default class AceTradingPlugin extends Plugin {
 			{ id: 'action', label: 'Action (long/short)', default: 'long' },
 			{ id: 'amount', label: 'Amount (base units)' },
 			{ id: 'allocation', label: 'Allocation (quote spent, positive)' },
+			{ id: 'tags', label: 'Tags, comma or space separated' },
 			{ id: 'account', label: 'Account/Where' },
 			{ id: 'initial_stop', label: 'Initial stop (price, optional)' },
 			{ id: 'timestamp', label: 'Timestamp (UTC)', default: defaults.lite }
@@ -229,8 +321,12 @@ export default class AceTradingPlugin extends Plugin {
 				const amount = parseNum(vals.amount); const allocation = parseNum(vals.allocation);
 				if (!Number.isFinite(amount) || amount <= 0) return new Notice('Amount must be > 0');
 				if (!Number.isFinite(allocation) || allocation <= 0) return new Notice('Allocation must be > 0');
-				const account = vals.account || '';
-				const initial_stop = parseNum(vals.initial_stop);
+				const account = (vals.account || '').trim();
+				const initialStop = parseNum(vals.initial_stop);
+				const tags: string[] = (vals.tags || '')
+					.split(/[\s,]+/)
+					.map(tag => tag.replace(/^#/, '').trim())
+					.filter(Boolean);
 				const tradeDate = toUtcDateFromInput(vals.timestamp || '', new Date())!;
 				const yyyy = tradeDate.getUTCFullYear(), mm = pad(tradeDate.getUTCMonth() + 1), dd = pad(tradeDate.getUTCDate()), hh = pad(tradeDate.getUTCHours()), mi = pad(tradeDate.getUTCMinutes());
 				const pairFlat = `${coinSym}${quoteSym}`;
@@ -249,28 +345,21 @@ export default class AceTradingPlugin extends Plugin {
 				let filePath = `${yearFolder}/${fileBasePattern}.md`;
 				let suffix = 1; while (this.app.vault.getAbstractFileByPath(filePath)) { filePath = `${yearFolder}/${fileBasePattern}-${suffix++}.md`; }
 				const price = allocation / amount;
-				const firstFill = buildFill({ dir, side: 'in', amount, price, when: tradeDate });
+				const firstFill: Fill = buildFill({ dir, side: 'in', amount, price, when: tradeDate });
 				const tsIso = toIsoUtc(tradeDate);
-				const fmLines: string[] = [
-					'---',
-					`id: ${id}`,
-					`schema_version: 2`,
-					`timestamp: ${tsIso}`,
-					`pair: ${coinSym}/${quoteSym}`,
-					`action: ${action}`,
-					`account: ${account}`,
-					`quote: ${quoteSym}`,
-				];
-				if (Number.isFinite(initial_stop)) fmLines.push(`initial_stop: ${initial_stop}`);
-				fmLines.push(
-					'fills:',
-					`  - side: ${firstFill.side}`,
-					`    t: ${firstFill.t}`,
-					`    base: ${firstFill.base}`,
-					`    quote: ${firstFill.quote}`,
-					`    price: ${firstFill.price}`,
-					'---'
-				);
+				const frontmatter: TradeFrontmatter = {
+					id,
+					schema_version: 2,
+					timestamp: tsIso,
+					pair: `${coinSym}/${quoteSym}`,
+					action,
+					lesson: '',
+					tags,
+					quote: quoteSym,
+					fills: [firstFill],
+				};
+				if (account) frontmatter.account = account;
+				if (Number.isFinite(initialStop)) frontmatter.initial_stop = initialStop;
 
 				let body = '';
 				try {
@@ -278,7 +367,7 @@ export default class AceTradingPlugin extends Plugin {
 				} catch {
 					new Notice(`Couldn't find trade template at ${this.settings.bodyTemplatePath}`, 0);
 				}
-				const content = `${fmLines.join('\n')}\n\n${body}`;
+				const content = `---\n${stringifyYaml(frontmatter)}---\n\n${body}`;
 				const file = await this.app.vault.create(filePath, content);
 				await this.persistMetrics(file);
 				await this.app.workspace.getLeaf(true).openFile(file);

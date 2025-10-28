@@ -6,3 +6,69 @@ available in the app when your plugin is enabled.
 If your plugin does not need CSS, delete this file.
 
 */
+
+.ace-trade-pane {
+	height: 100%;
+}
+
+.ace-trade-pane-body {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-4);
+	padding: var(--size-4-4);
+	overflow-y: auto;
+	height: 100%;
+	box-sizing: border-box;
+}
+
+.ace-trade-pane-header h2 {
+	margin: 0;
+	font-size: var(--font-ui-medium);
+}
+
+.ace-trade-pane-section {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-2-2);
+}
+
+.ace-trade-pane-section h3 {
+	margin: 0;
+	font-size: var(--font-ui-small);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--text-muted);
+}
+
+.ace-trade-metrics,
+.ace-trade-fills {
+	border-collapse: collapse;
+	width: 100%;
+	font-size: var(--font-ui-small);
+}
+
+.ace-trade-metrics th {
+	text-align: left;
+	color: var(--text-muted);
+	padding: 2px 4px;
+}
+
+.ace-trade-metrics td {
+	padding: 2px 4px;
+}
+
+.ace-trade-fills th,
+.ace-trade-fills td {
+	text-align: left;
+	padding: 4px 6px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.ace-trade-fills tbody tr:last-child td {
+	border-bottom: none;
+}
+
+.ace-trade-pane-actions {
+	margin-top: auto;
+	gap: var(--size-2-2);
+}
