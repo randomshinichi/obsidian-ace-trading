@@ -1,0 +1,1445 @@
+# Obsidian API Documentation
+
+## Introduction
+
+The Obsidian API is a comprehensive TypeScript type definition library that enables developers to create powerful plugins for Obsidian, a knowledge base and note-taking application built on local markdown files. The API provides complete access to the application's core functionality, including file system operations, metadata caching, workspace management, editor interactions, and UI components. Developers can extend Obsidian's capabilities by creating custom views, commands, settings panels, markdown processors, and event handlers that integrate seamlessly with the application's architecture.
+
+This API is designed for both desktop and mobile platforms, with explicit flags for desktop-only features that utilize NodeJS or Electron APIs. The type definitions follow Obsidian's release cycle and provide strongly-typed interfaces for all major modules including the Vault (file operations), Workspace (UI layout), MetadataCache (parsed markdown data), and Editor (CodeMirror 6 wrapper). Plugin developers inherit from a base Plugin class that provides lifecycle management, automatic cleanup of resources, data persistence, and convenient methods for registering commands, views, settings tabs, and event handlers.
+
+## APIs and Key Functions
+
+### Plugin Class - Core Plugin Lifecycle
+
+The Plugin class is the foundation for all Obsidian plugins, providing lifecycle hooks and registration methods for commands, views, settings, and event handlers.
+
+```typescript
+import { Plugin, Notice, MarkdownView } from 'obsidian';
+
+export default class MyPlugin extends Plugin {
+    settings: MyPluginSettings;
+
+    async onload() {
+        // Called when plugin is loaded - setup everything here
+        await this.loadSettings();
+
+        // Add a ribbon icon
+        this.addRibbonIcon('dice', 'My Plugin', () => {
+            new Notice('Ribbon icon clicked!');
+        });
+
+        // Add a status bar item
+        const statusBarItem = this.addStatusBarItem();
+        statusBarItem.setText('Status: Active');
+
+        // Add a command
+        this.addCommand({
+            id: 'open-sample-modal',
+            name: 'Open Sample Modal',
+            callback: () => {
+                new Notice('Command executed!');
+            }
+        });
+
+        // Add an editor command
+        this.addCommand({
+            id: 'insert-text',
+            name: 'Insert Hello World',
+            editorCallback: (editor: Editor, view: MarkdownView) => {
+                editor.replaceSelection('Hello World!');
+            }
+        });
+
+        // Register events with auto-cleanup
+        this.registerEvent(
+            this.app.vault.on('create', (file) => {
+                console.log('File created:', file.path);
+            })
+        );
+
+        // Add settings tab
+        this.addSettingTab(new MySettingTab(this.app, this));
+    }
+
+    onunload() {
+        // Called when plugin is disabled - cleanup happens automatically
+        console.log('Plugin unloaded');
+    }
+
+    async loadSettings() {
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    }
+
+    async saveSettings() {
+        await this.saveData(this.settings);
+    }
+}
+
+interface MyPluginSettings {
+    mySetting: string;
+}
+
+const DEFAULT_SETTINGS: MyPluginSettings = {
+    mySetting: 'default'
+};
+```
+
+### Vault API - File System Operations
+
+The Vault API provides methods for reading, writing, creating, and managing files and folders within the Obsidian vault.
+
+```typescript
+import { Plugin, TFile, TFolder, Notice } from 'obsidian';
+
+export default class FileManagerPlugin extends Plugin {
+    async onload() {
+        this.addCommand({
+            id: 'create-note',
+            name: 'Create New Note',
+            callback: async () => {
+                try {
+                    // Create a new markdown file
+                    const fileName = `Note-${Date.now()}.md`;
+                    const content = '# My New Note\n\nThis is the content.';
+                    const file = await this.app.vault.create(fileName, content);
+                    new Notice(`Created: ${file.name}`);
+
+                    // Open the file
+                    const leaf = this.app.workspace.getLeaf();
+                    await leaf.openFile(file);
+                } catch (error) {
+                    new Notice(`Error: ${error.message}`);
+                }
+            }
+        });
+
+        this.addCommand({
+            id: 'read-current-file',
+            name: 'Read Current File',
+            callback: async () => {
+                const file = this.app.workspace.getActiveFile();
+                if (!file) {
+                    new Notice('No file is open');
+                    return;
+                }
+
+                // Read file content (cached for display)
+                const content = await this.app.vault.cachedRead(file);
+                console.log('File content:', content);
+
+                // Or read directly from disk
+                const diskContent = await this.app.vault.read(file);
+
+                // Get file stats
+                console.log('File size:', file.stat.size);
+                console.log('Modified:', new Date(file.stat.mtime));
+            }
+        });
+
+        this.addCommand({
+            id: 'modify-file',
+            name: 'Modify Current File',
+            callback: async () => {
+                const file = this.app.workspace.getActiveFile();
+                if (!file) return;
+
+                const content = await this.app.vault.read(file);
+                const newContent = content + '\n\nAppended text!';
+                await this.app.vault.modify(file, newContent);
+                new Notice('File modified!');
+            }
+        });
+
+        this.addCommand({
+            id: 'list-files',
+            name: 'List All Markdown Files',
+            callback: () => {
+                const files = this.app.vault.getMarkdownFiles();
+                console.log(`Found ${files.length} markdown files:`);
+                files.forEach(file => {
+                    console.log(`- ${file.path}`);
+                });
+            }
+        });
+
+        this.addCommand({
+            id: 'create-folder',
+            name: 'Create Folder',
+            callback: async () => {
+                try {
+                    const folder = await this.app.vault.createFolder('MyFolder/SubFolder');
+                    new Notice(`Created folder: ${folder.path}`);
+                } catch (error) {
+                    // Folder might already exist
+                    new Notice('Folder already exists or error occurred');
+                }
+            }
+        });
+
+        // Listen to file events
+        this.registerEvent(
+            this.app.vault.on('create', (file) => {
+                if (file instanceof TFile) {
+                    console.log('File created:', file.path);
+                }
+            })
+        );
+
+        this.registerEvent(
+            this.app.vault.on('modify', (file) => {
+                if (file instanceof TFile) {
+                    console.log('File modified:', file.path);
+                }
+            })
+        );
+
+        this.registerEvent(
+            this.app.vault.on('delete', (file) => {
+                console.log('File deleted:', file.path);
+            })
+        );
+
+        this.registerEvent(
+            this.app.vault.on('rename', (file, oldPath) => {
+                console.log(`File renamed from ${oldPath} to ${file.path}`);
+            })
+        );
+    }
+}
+```
+
+### MetadataCache API - Accessing Parsed Markdown
+
+The MetadataCache provides fast access to parsed markdown content including links, headings, tags, and frontmatter without re-parsing files.
+
+```typescript
+import { Plugin, TFile, Notice } from 'obsidian';
+
+export default class MetadataPlugin extends Plugin {
+    async onload() {
+        this.addCommand({
+            id: 'show-metadata',
+            name: 'Show File Metadata',
+            callback: () => {
+                const file = this.app.workspace.getActiveFile();
+                if (!file) return;
+
+                const cache = this.app.metadataCache.getFileCache(file);
+                if (!cache) {
+                    new Notice('No metadata available yet');
+                    return;
+                }
+
+                console.log('=== File Metadata ===');
+
+                // Headings
+                if (cache.headings) {
+                    console.log('Headings:');
+                    cache.headings.forEach(h => {
+                        console.log(`${'  '.repeat(h.level - 1)}${h.heading} (level ${h.level})`);
+                    });
+                }
+
+                // Links
+                if (cache.links) {
+                    console.log('Links:', cache.links.map(l => l.link));
+                }
+
+                // Tags
+                if (cache.tags) {
+                    console.log('Tags:', cache.tags.map(t => t.tag));
+                }
+
+                // Frontmatter
+                if (cache.frontmatter) {
+                    console.log('Frontmatter:', cache.frontmatter);
+                }
+
+                // Blocks
+                if (cache.blocks) {
+                    console.log('Block IDs:', Object.keys(cache.blocks));
+                }
+            }
+        });
+
+        this.addCommand({
+            id: 'find-backlinks',
+            name: 'Find Files Linking Here',
+            callback: () => {
+                const file = this.app.workspace.getActiveFile();
+                if (!file) return;
+
+                const backlinks: string[] = [];
+                const resolvedLinks = this.app.metadataCache.resolvedLinks;
+
+                // Find all files that link to current file
+                for (const [sourcePath, links] of Object.entries(resolvedLinks)) {
+                    if (links[file.path]) {
+                        backlinks.push(sourcePath);
+                    }
+                }
+
+                console.log(`Files linking to ${file.path}:`, backlinks);
+                new Notice(`Found ${backlinks.length} backlinks`);
+            }
+        });
+
+        this.addCommand({
+            id: 'resolve-link',
+            name: 'Resolve Link Under Cursor',
+            callback: () => {
+                const file = this.app.workspace.getActiveFile();
+                if (!file) return;
+
+                // Example: resolve a link
+                const linkpath = 'My Other Note';
+                const resolved = this.app.metadataCache.getFirstLinkpathDest(
+                    linkpath,
+                    file.path
+                );
+
+                if (resolved) {
+                    console.log(`Resolved to: ${resolved.path}`);
+                } else {
+                    console.log('Link not resolved');
+                }
+            }
+        });
+
+        // Listen for metadata changes
+        this.registerEvent(
+            this.app.metadataCache.on('changed', (file, data, cache) => {
+                console.log(`Metadata updated for ${file.path}`);
+                if (cache.tags) {
+                    console.log('Tags:', cache.tags.map(t => t.tag));
+                }
+            })
+        );
+
+        // Wait for all metadata to be resolved
+        this.registerEvent(
+            this.app.metadataCache.on('resolved', () => {
+                console.log('All metadata has been resolved');
+            })
+        );
+    }
+}
+```
+
+### Editor API - Text Manipulation
+
+The Editor API provides methods for interacting with the CodeMirror 6 editor, including reading and modifying content, managing selections, and scrolling.
+
+```typescript
+import { Plugin, Editor, MarkdownView, EditorPosition } from 'obsidian';
+
+export default class EditorPlugin extends Plugin {
+    async onload() {
+        this.addCommand({
+            id: 'insert-date',
+            name: 'Insert Current Date',
+            editorCallback: (editor: Editor, view: MarkdownView) => {
+                const date = new Date().toISOString().split('T')[0];
+                editor.replaceSelection(date);
+            }
+        });
+
+        this.addCommand({
+            id: 'uppercase-selection',
+            name: 'Uppercase Selection',
+            editorCallback: (editor: Editor) => {
+                const selection = editor.getSelection();
+                if (selection) {
+                    editor.replaceSelection(selection.toUpperCase());
+                }
+            }
+        });
+
+        this.addCommand({
+            id: 'count-words',
+            name: 'Count Words',
+            editorCallback: (editor: Editor) => {
+                const content = editor.getValue();
+                const words = content.split(/\s+/).filter(w => w.length > 0);
+                new Notice(`Word count: ${words.length}`);
+            }
+        });
+
+        this.addCommand({
+            id: 'insert-at-top',
+            name: 'Insert at Top',
+            editorCallback: (editor: Editor) => {
+                const firstLine = editor.getLine(0);
+                const insertText = '> **Note added at top**\n\n';
+                editor.replaceRange(insertText, { line: 0, ch: 0 });
+            }
+        });
+
+        this.addCommand({
+            id: 'goto-line',
+            name: 'Go to Line 10',
+            editorCallback: (editor: Editor) => {
+                const line = 10;
+                if (line < editor.lineCount()) {
+                    editor.setCursor({ line, ch: 0 });
+                    editor.scrollIntoView({
+                        from: { line, ch: 0 },
+                        to: { line, ch: 0 }
+                    }, true);
+                }
+            }
+        });
+
+        this.addCommand({
+            id: 'select-current-line',
+            name: 'Select Current Line',
+            editorCallback: (editor: Editor) => {
+                const cursor = editor.getCursor();
+                const line = cursor.line;
+                const lineText = editor.getLine(line);
+                editor.setSelection(
+                    { line, ch: 0 },
+                    { line, ch: lineText.length }
+                );
+            }
+        });
+
+        this.addCommand({
+            id: 'get-cursor-info',
+            name: 'Get Cursor Info',
+            editorCallback: (editor: Editor) => {
+                const cursor = editor.getCursor();
+                const line = editor.getLine(cursor.line);
+                const wordUnderCursor = this.getWordAt(line, cursor.ch);
+
+                console.log('Cursor position:', cursor);
+                console.log('Current line:', line);
+                console.log('Word under cursor:', wordUnderCursor);
+                console.log('Total lines:', editor.lineCount());
+                console.log('Has selection:', editor.somethingSelected());
+            }
+        });
+
+        this.addCommand({
+            id: 'insert-template',
+            name: 'Insert Template',
+            editorCallback: (editor: Editor) => {
+                const template = `
+## Meeting Notes
+
+**Date:** ${new Date().toLocaleDateString()}
+**Attendees:**
+
+### Agenda
+-
+
+### Discussion
+
+### Action Items
+- [ ]
+`;
+                editor.replaceSelection(template);
+            }
+        });
+    }
+
+    getWordAt(line: string, ch: number): string {
+        const wordBoundary = /\s/;
+        let start = ch;
+        let end = ch;
+
+        while (start > 0 && !wordBoundary.test(line[start - 1])) start--;
+        while (end < line.length && !wordBoundary.test(line[end])) end++;
+
+        return line.slice(start, end);
+    }
+}
+```
+
+### Workspace API - Layout and View Management
+
+The Workspace API manages the application's UI layout, including panes, tabs, splits, and custom views.
+
+```typescript
+import { Plugin, WorkspaceLeaf, ItemView, Notice } from 'obsidian';
+
+const VIEW_TYPE_EXAMPLE = 'example-view';
+
+class ExampleView extends ItemView {
+    getViewType() {
+        return VIEW_TYPE_EXAMPLE;
+    }
+
+    getDisplayText() {
+        return 'Example View';
+    }
+
+    async onOpen() {
+        const container = this.containerEl.children[1];
+        container.empty();
+        container.createEl('h4', { text: 'Custom View' });
+        container.createEl('p', { text: 'This is a custom view!' });
+    }
+
+    async onClose() {
+        // Cleanup if needed
+    }
+}
+
+export default class WorkspacePlugin extends Plugin {
+    async onload() {
+        // Register custom view
+        this.registerView(
+            VIEW_TYPE_EXAMPLE,
+            (leaf) => new ExampleView(leaf)
+        );
+
+        this.addCommand({
+            id: 'open-custom-view',
+            name: 'Open Custom View',
+            callback: async () => {
+                // Get or create a leaf for the view
+                const leaf = this.app.workspace.getRightLeaf(false);
+                await leaf.setViewState({
+                    type: VIEW_TYPE_EXAMPLE,
+                    active: true,
+                });
+
+                // Reveal the leaf (show sidebar)
+                this.app.workspace.revealLeaf(leaf);
+            }
+        });
+
+        this.addCommand({
+            id: 'split-right',
+            name: 'Open Current Note in Split',
+            callback: async () => {
+                const file = this.app.workspace.getActiveFile();
+                if (!file) return;
+
+                // Get a new leaf (split pane)
+                const leaf = this.app.workspace.getLeaf('split');
+                await leaf.openFile(file);
+            }
+        });
+
+        this.addCommand({
+            id: 'open-in-new-tab',
+            name: 'Open Note in New Tab',
+            callback: async () => {
+                const file = this.app.workspace.getActiveFile();
+                if (!file) return;
+
+                const leaf = this.app.workspace.getLeaf('tab');
+                await leaf.openFile(file);
+            }
+        });
+
+        this.addCommand({
+            id: 'get-all-markdown-views',
+            name: 'Get All Markdown Views',
+            callback: () => {
+                const markdownLeaves = this.app.workspace.getLeavesOfType('markdown');
+                console.log(`Found ${markdownLeaves.length} markdown views:`);
+                markdownLeaves.forEach(leaf => {
+                    const view = leaf.view;
+                    if (view instanceof MarkdownView && view.file) {
+                        console.log(`- ${view.file.path}`);
+                    }
+                });
+            }
+        });
+
+        // Listen to workspace events
+        this.registerEvent(
+            this.app.workspace.on('active-leaf-change', (leaf) => {
+                if (leaf?.view) {
+                    console.log('Active view changed:', leaf.view.getViewType());
+                }
+            })
+        );
+
+        this.registerEvent(
+            this.app.workspace.on('file-open', (file) => {
+                if (file) {
+                    console.log('File opened:', file.path);
+                }
+            })
+        );
+
+        this.registerEvent(
+            this.app.workspace.on('layout-change', () => {
+                console.log('Layout changed');
+            })
+        );
+
+        // Run when layout is ready
+        this.app.workspace.onLayoutReady(() => {
+            console.log('Workspace layout is ready');
+        });
+    }
+}
+```
+
+### Settings API - Creating Settings UI
+
+The Settings API provides components for building plugin configuration interfaces with various input types.
+
+```typescript
+import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
+
+interface MyPluginSettings {
+    apiKey: string;
+    enableFeature: boolean;
+    maxItems: number;
+    selectedOption: string;
+    favoriteColor: string;
+}
+
+const DEFAULT_SETTINGS: MyPluginSettings = {
+    apiKey: '',
+    enableFeature: true,
+    maxItems: 10,
+    selectedOption: 'option1',
+    favoriteColor: '#ff0000'
+};
+
+export default class SettingsPlugin extends Plugin {
+    settings: MyPluginSettings;
+
+    async onload() {
+        await this.loadSettings();
+        this.addSettingTab(new MySettingTab(this.app, this));
+    }
+
+    async loadSettings() {
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    }
+
+    async saveSettings() {
+        await this.saveData(this.settings);
+    }
+}
+
+class MySettingTab extends PluginSettingTab {
+    plugin: SettingsPlugin;
+
+    constructor(app: App, plugin: SettingsPlugin) {
+        super(app, plugin);
+        this.plugin = plugin;
+    }
+
+    display(): void {
+        const { containerEl } = this;
+        containerEl.empty();
+
+        // Heading
+        containerEl.createEl('h2', { text: 'My Plugin Settings' });
+
+        // Text input
+        new Setting(containerEl)
+            .setName('API Key')
+            .setDesc('Enter your API key')
+            .addText(text => text
+                .setPlaceholder('Enter your key')
+                .setValue(this.plugin.settings.apiKey)
+                .onChange(async (value) => {
+                    this.plugin.settings.apiKey = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        // Toggle
+        new Setting(containerEl)
+            .setName('Enable Feature')
+            .setDesc('Turn this feature on or off')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.enableFeature)
+                .onChange(async (value) => {
+                    this.plugin.settings.enableFeature = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        // Slider
+        new Setting(containerEl)
+            .setName('Max Items')
+            .setDesc('Maximum number of items to display')
+            .addSlider(slider => slider
+                .setLimits(1, 100, 1)
+                .setValue(this.plugin.settings.maxItems)
+                .setDynamicTooltip()
+                .onChange(async (value) => {
+                    this.plugin.settings.maxItems = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        // Dropdown
+        new Setting(containerEl)
+            .setName('Select Option')
+            .setDesc('Choose an option from the list')
+            .addDropdown(dropdown => dropdown
+                .addOption('option1', 'Option 1')
+                .addOption('option2', 'Option 2')
+                .addOption('option3', 'Option 3')
+                .setValue(this.plugin.settings.selectedOption)
+                .onChange(async (value) => {
+                    this.plugin.settings.selectedOption = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        // Color picker
+        new Setting(containerEl)
+            .setName('Favorite Color')
+            .setDesc('Choose your favorite color')
+            .addColorPicker(color => color
+                .setValue(this.plugin.settings.favoriteColor)
+                .onChange(async (value) => {
+                    this.plugin.settings.favoriteColor = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        // Button
+        new Setting(containerEl)
+            .setName('Reset Settings')
+            .setDesc('Reset all settings to default values')
+            .addButton(button => button
+                .setButtonText('Reset')
+                .setWarning()
+                .onClick(async () => {
+                    this.plugin.settings = Object.assign({}, DEFAULT_SETTINGS);
+                    await this.plugin.saveSettings();
+                    this.display(); // Refresh the settings tab
+                    new Notice('Settings reset to defaults');
+                }));
+    }
+}
+```
+
+### Modal API - Creating Dialog Windows
+
+The Modal API provides a way to create popup dialogs for user interaction and information display.
+
+```typescript
+import { App, Modal, Plugin, Setting, Notice } from 'obsidian';
+
+export default class ModalPlugin extends Plugin {
+    async onload() {
+        this.addCommand({
+            id: 'open-simple-modal',
+            name: 'Open Simple Modal',
+            callback: () => {
+                new SimpleModal(this.app).open();
+            }
+        });
+
+        this.addCommand({
+            id: 'open-input-modal',
+            name: 'Open Input Modal',
+            callback: () => {
+                new InputModal(this.app, (result) => {
+                    new Notice(`You entered: ${result}`);
+                }).open();
+            }
+        });
+
+        this.addCommand({
+            id: 'open-confirmation-modal',
+            name: 'Open Confirmation Modal',
+            callback: () => {
+                new ConfirmationModal(this.app, () => {
+                    new Notice('Confirmed!');
+                }).open();
+            }
+        });
+    }
+}
+
+class SimpleModal extends Modal {
+    constructor(app: App) {
+        super(app);
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+        contentEl.createEl('h2', { text: 'Simple Modal' });
+        contentEl.createEl('p', { text: 'This is a simple modal dialog.' });
+
+        new Setting(contentEl)
+            .addButton(btn => btn
+                .setButtonText('Close')
+                .setCta()
+                .onClick(() => {
+                    this.close();
+                }));
+    }
+
+    onClose() {
+        const { contentEl } = this;
+        contentEl.empty();
+    }
+}
+
+class InputModal extends Modal {
+    result: string;
+    onSubmit: (result: string) => void;
+
+    constructor(app: App, onSubmit: (result: string) => void) {
+        super(app);
+        this.onSubmit = onSubmit;
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+
+        contentEl.createEl('h2', { text: 'Enter Your Name' });
+
+        new Setting(contentEl)
+            .setName('Name')
+            .addText(text => text
+                .onChange((value) => {
+                    this.result = value;
+                }));
+
+        new Setting(contentEl)
+            .addButton(btn => btn
+                .setButtonText('Submit')
+                .setCta()
+                .onClick(() => {
+                    this.close();
+                    this.onSubmit(this.result);
+                }))
+            .addButton(btn => btn
+                .setButtonText('Cancel')
+                .onClick(() => {
+                    this.close();
+                }));
+    }
+
+    onClose() {
+        const { contentEl } = this;
+        contentEl.empty();
+    }
+}
+
+class ConfirmationModal extends Modal {
+    onConfirm: () => void;
+
+    constructor(app: App, onConfirm: () => void) {
+        super(app);
+        this.onConfirm = onConfirm;
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+
+        contentEl.createEl('h2', { text: 'Confirm Action' });
+        contentEl.createEl('p', { text: 'Are you sure you want to proceed?' });
+
+        new Setting(contentEl)
+            .addButton(btn => btn
+                .setButtonText('Yes')
+                .setCta()
+                .onClick(() => {
+                    this.close();
+                    this.onConfirm();
+                }))
+            .addButton(btn => btn
+                .setButtonText('No')
+                .onClick(() => {
+                    this.close();
+                }));
+    }
+
+    onClose() {
+        const { contentEl } = this;
+        contentEl.empty();
+    }
+}
+```
+
+### Markdown Post Processing - Transforming Rendered Content
+
+The Markdown Post Processing API allows plugins to modify rendered markdown content by processing HTML elements after rendering.
+
+```typescript
+import { Plugin, MarkdownPostProcessorContext } from 'obsidian';
+
+export default class PostProcessorPlugin extends Plugin {
+    async onload() {
+        // Register a general post processor
+        this.registerMarkdownPostProcessor((element, context) => {
+            // Add a class to all headings
+            const headings = element.querySelectorAll('h1, h2, h3, h4, h5, h6');
+            headings.forEach(heading => {
+                heading.addClass('custom-heading');
+            });
+
+            // Process all links
+            const links = element.querySelectorAll('a.internal-link');
+            links.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    console.log('Link clicked:', link.getAttribute('href'));
+                });
+            });
+        });
+
+        // Register a code block processor for custom language
+        this.registerMarkdownCodeBlockProcessor('mermaid-custom', async (source, el, ctx) => {
+            // Create custom rendering for this code block
+            el.empty();
+            el.createEl('div', {
+                text: 'Custom Mermaid Diagram',
+                cls: 'mermaid-custom'
+            });
+            el.createEl('pre', { text: source });
+        });
+
+        // Register a code block processor for charts
+        this.registerMarkdownCodeBlockProcessor('chart', async (source, el, ctx) => {
+            el.empty();
+
+            try {
+                const data = JSON.parse(source);
+
+                const container = el.createEl('div', { cls: 'chart-container' });
+                container.createEl('h4', { text: data.title || 'Chart' });
+
+                const chartEl = container.createEl('div', { cls: 'chart' });
+
+                // Simple bar chart example
+                if (data.type === 'bar' && data.values) {
+                    data.values.forEach((item: any) => {
+                        const bar = chartEl.createEl('div', { cls: 'chart-bar' });
+                        bar.createEl('span', { text: item.label });
+                        bar.createEl('div', {
+                            cls: 'bar',
+                            attr: { style: `width: ${item.value}%` }
+                        });
+                    });
+                }
+            } catch (error) {
+                el.createEl('div', {
+                    text: `Error parsing chart: ${error.message}`,
+                    cls: 'chart-error'
+                });
+            }
+        });
+
+        // Register processor for embedding custom content
+        this.registerMarkdownCodeBlockProcessor('embed-tweet', async (source, el, ctx) => {
+            const tweetId = source.trim();
+
+            el.empty();
+            const container = el.createEl('div', { cls: 'tweet-embed' });
+            container.createEl('p', { text: `Tweet ID: ${tweetId}` });
+            container.createEl('a', {
+                text: 'View on Twitter',
+                attr: {
+                    href: `https://twitter.com/i/web/status/${tweetId}`,
+                    target: '_blank'
+                }
+            });
+        });
+
+        // Register processor for task lists with custom behavior
+        this.registerMarkdownPostProcessor((element, context) => {
+            const tasks = element.querySelectorAll('.task-list-item');
+
+            tasks.forEach(task => {
+                const checkbox = task.querySelector('input[type="checkbox"]');
+                if (checkbox) {
+                    checkbox.addEventListener('change', async (e) => {
+                        const target = e.target as HTMLInputElement;
+                        console.log('Task checked:', target.checked);
+
+                        // You could update the source file here
+                        // const file = this.app.vault.getAbstractFileByPath(context.sourcePath);
+                        // if (file instanceof TFile) {
+                        //     // Update task in file content
+                        // }
+                    });
+                }
+            });
+        });
+    }
+}
+```
+
+### Commands API - Registering Keyboard Shortcuts and Actions
+
+The Commands API enables plugins to register actions that users can trigger via the command palette or keyboard shortcuts.
+
+```typescript
+import { Plugin, Editor, MarkdownView, Notice } from 'obsidian';
+
+export default class CommandsPlugin extends Plugin {
+    async onload() {
+        // Simple command
+        this.addCommand({
+            id: 'hello-world',
+            name: 'Hello World',
+            callback: () => {
+                new Notice('Hello World!');
+            }
+        });
+
+        // Command with default hotkey
+        this.addCommand({
+            id: 'quick-note',
+            name: 'Create Quick Note',
+            hotkey: { modifiers: ['Mod', 'Shift'], key: 'n' },
+            callback: async () => {
+                const fileName = `Quick-${Date.now()}.md`;
+                const file = await this.app.vault.create(fileName, '# Quick Note\n\n');
+                const leaf = this.app.workspace.getLeaf();
+                await leaf.openFile(file);
+            }
+        });
+
+        // Editor command (only available when editor is active)
+        this.addCommand({
+            id: 'insert-timestamp',
+            name: 'Insert Timestamp',
+            editorCallback: (editor: Editor, view: MarkdownView) => {
+                const timestamp = new Date().toLocaleString();
+                editor.replaceSelection(timestamp);
+            }
+        });
+
+        // Conditional command using checkCallback
+        this.addCommand({
+            id: 'format-markdown-table',
+            name: 'Format Markdown Table',
+            checkCallback: (checking: boolean) => {
+                const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+
+                // Check if we have an active markdown view
+                if (view) {
+                    if (!checking) {
+                        // Execute the command
+                        const editor = view.editor;
+                        const selection = editor.getSelection();
+
+                        if (selection.includes('|')) {
+                            // Format table logic here
+                            new Notice('Formatting table...');
+                        } else {
+                            new Notice('No table selected');
+                        }
+                    }
+                    return true; // Command is available
+                }
+
+                return false; // Command is not available
+            }
+        });
+
+        // Command that works with current file
+        this.addCommand({
+            id: 'file-stats',
+            name: 'Show File Statistics',
+            callback: async () => {
+                const file = this.app.workspace.getActiveFile();
+                if (!file) {
+                    new Notice('No file is open');
+                    return;
+                }
+
+                const content = await this.app.vault.cachedRead(file);
+                const words = content.split(/\s+/).filter(w => w.length > 0).length;
+                const chars = content.length;
+                const lines = content.split('\n').length;
+
+                new Notice(
+                    `File: ${file.name}\n` +
+                    `Lines: ${lines}\n` +
+                    `Words: ${words}\n` +
+                    `Characters: ${chars}`
+                );
+            }
+        });
+
+        // Repeatable command (hold key to repeat)
+        this.addCommand({
+            id: 'indent-line',
+            name: 'Indent Current Line',
+            repeatable: true,
+            editorCallback: (editor: Editor) => {
+                const cursor = editor.getCursor();
+                const line = editor.getLine(cursor.line);
+                editor.setLine(cursor.line, '  ' + line);
+            }
+        });
+
+        // Command with icon
+        this.addCommand({
+            id: 'open-settings',
+            name: 'Open Plugin Settings',
+            icon: 'settings',
+            callback: () => {
+                // Open settings
+                (this.app as any).setting.open();
+                (this.app as any).setting.openTabById(this.manifest.id);
+            }
+        });
+    }
+}
+```
+
+### Events API - Listening to Application Events
+
+The Events API provides a way to subscribe to various application events and respond to changes in the workspace, vault, and metadata.
+
+```typescript
+import { Plugin, TFile, TFolder, EventRef, Notice } from 'obsidian';
+
+export default class EventsPlugin extends Plugin {
+    eventRefs: EventRef[] = [];
+
+    async onload() {
+        // File creation event
+        this.registerEvent(
+            this.app.vault.on('create', (file) => {
+                if (file instanceof TFile) {
+                    console.log('File created:', file.path);
+                    new Notice(`Created: ${file.name}`);
+                }
+            })
+        );
+
+        // File modification event
+        this.registerEvent(
+            this.app.vault.on('modify', async (file) => {
+                if (file instanceof TFile && file.extension === 'md') {
+                    const content = await this.app.vault.cachedRead(file);
+                    const wordCount = content.split(/\s+/).length;
+                    console.log(`${file.name} modified - ${wordCount} words`);
+                }
+            })
+        );
+
+        // File deletion event
+        this.registerEvent(
+            this.app.vault.on('delete', (file) => {
+                console.log('File deleted:', file.path);
+            })
+        );
+
+        // File rename event
+        this.registerEvent(
+            this.app.vault.on('rename', (file, oldPath) => {
+                console.log(`File renamed: ${oldPath} -> ${file.path}`);
+            })
+        );
+
+        // Workspace events
+        this.registerEvent(
+            this.app.workspace.on('file-open', (file) => {
+                if (file) {
+                    console.log('File opened:', file.path);
+                } else {
+                    console.log('No file open');
+                }
+            })
+        );
+
+        this.registerEvent(
+            this.app.workspace.on('active-leaf-change', (leaf) => {
+                if (leaf) {
+                    console.log('Active leaf changed:', leaf.view.getViewType());
+                }
+            })
+        );
+
+        this.registerEvent(
+            this.app.workspace.on('layout-change', () => {
+                console.log('Layout changed');
+            })
+        );
+
+        // Metadata cache events
+        this.registerEvent(
+            this.app.metadataCache.on('changed', (file, data, cache) => {
+                console.log('Metadata changed for:', file.path);
+                if (cache.tags) {
+                    console.log('Tags:', cache.tags.map(t => t.tag).join(', '));
+                }
+            })
+        );
+
+        this.registerEvent(
+            this.app.metadataCache.on('resolved', () => {
+                console.log('All metadata resolved');
+            })
+        );
+
+        // DOM events with automatic cleanup
+        this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
+            console.log('Document clicked at:', evt.clientX, evt.clientY);
+        });
+
+        // Window events
+        this.registerDomEvent(window, 'resize', () => {
+            console.log('Window resized:', window.innerWidth, window.innerHeight);
+        });
+
+        // Interval with automatic cleanup
+        const intervalId = window.setInterval(() => {
+            const file = this.app.workspace.getActiveFile();
+            if (file) {
+                console.log('Active file:', file.path);
+            }
+        }, 30000); // Every 30 seconds
+
+        this.registerInterval(intervalId);
+
+        // Custom cleanup function
+        this.register(() => {
+            console.log('Plugin is unloading, cleaning up...');
+        });
+    }
+
+    onunload() {
+        console.log('EventsPlugin unloaded');
+        // All registered events are automatically cleaned up
+    }
+}
+```
+
+### Notice API - Displaying Toast Notifications
+
+The Notice API provides a simple way to display temporary notification messages to users.
+
+```typescript
+import { Plugin, Notice } from 'obsidian';
+
+export default class NoticePlugin extends Plugin {
+    async onload() {
+        this.addCommand({
+            id: 'show-simple-notice',
+            name: 'Show Simple Notice',
+            callback: () => {
+                // Simple notice with default duration (5 seconds)
+                new Notice('This is a simple notice');
+            }
+        });
+
+        this.addCommand({
+            id: 'show-short-notice',
+            name: 'Show Short Notice',
+            callback: () => {
+                // Short notice (2 seconds)
+                new Notice('Quick message!', 2000);
+            }
+        });
+
+        this.addCommand({
+            id: 'show-persistent-notice',
+            name: 'Show Persistent Notice',
+            callback: () => {
+                // Persistent notice (0 = stays until dismissed)
+                const notice = new Notice('This stays until dismissed', 0);
+
+                // Manually hide after some condition
+                setTimeout(() => {
+                    notice.hide();
+                }, 10000);
+            }
+        });
+
+        this.addCommand({
+            id: 'show-progress-notice',
+            name: 'Show Progress Notice',
+            callback: async () => {
+                const notice = new Notice('Processing...', 0);
+
+                // Simulate long operation
+                for (let i = 1; i <= 5; i++) {
+                    await sleep(1000);
+                    notice.setMessage(`Processing step ${i}/5...`);
+                }
+
+                notice.setMessage('Done!');
+                setTimeout(() => notice.hide(), 2000);
+            }
+        });
+
+        this.addCommand({
+            id: 'show-error-notice',
+            name: 'Show Error Notice',
+            callback: () => {
+                const notice = new Notice('', 5000);
+                notice.noticeEl.addClass('notice-error');
+                notice.setMessage('❌ An error occurred!');
+            }
+        });
+
+        this.addCommand({
+            id: 'show-success-notice',
+            name: 'Show Success Notice',
+            callback: () => {
+                const notice = new Notice('', 3000);
+                notice.noticeEl.addClass('notice-success');
+                notice.setMessage('✅ Operation successful!');
+            }
+        });
+
+        this.addCommand({
+            id: 'show-custom-notice',
+            name: 'Show Custom Notice with Button',
+            callback: () => {
+                const notice = new Notice('', 0);
+
+                const fragment = document.createDocumentFragment();
+                fragment.createEl('span', { text: 'Custom notice with action: ' });
+
+                const button = fragment.createEl('button', { text: 'Click me' });
+                button.addEventListener('click', () => {
+                    new Notice('Button clicked!');
+                    notice.hide();
+                });
+
+                notice.setMessage(fragment);
+            }
+        });
+    }
+}
+
+function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+```
+
+### Canvas API - Working with Canvas Files
+
+The Canvas API provides type definitions for working with Obsidian Canvas files, which are JSON-based node-and-edge graph documents.
+
+```typescript
+import { Plugin, TFile, Notice } from 'obsidian';
+import { CanvasData, CanvasFileData, CanvasTextData, CanvasEdgeData } from 'obsidian/canvas';
+
+export default class CanvasPlugin extends Plugin {
+    async onload() {
+        this.addCommand({
+            id: 'create-canvas',
+            name: 'Create New Canvas',
+            callback: async () => {
+                const canvasData: CanvasData = {
+                    nodes: [
+                        {
+                            id: '1',
+                            type: 'text',
+                            text: '# Welcome\n\nThis is a text node',
+                            x: 0,
+                            y: 0,
+                            width: 250,
+                            height: 150,
+                            color: '1'
+                        } as CanvasTextData,
+                        {
+                            id: '2',
+                            type: 'text',
+                            text: 'Another node',
+                            x: 300,
+                            y: 0,
+                            width: 200,
+                            height: 100
+                        } as CanvasTextData
+                    ],
+                    edges: [
+                        {
+                            id: 'edge1',
+                            fromNode: '1',
+                            fromSide: 'right',
+                            toNode: '2',
+                            toSide: 'left',
+                            label: 'connects to'
+                        } as CanvasEdgeData
+                    ]
+                };
+
+                const fileName = `Canvas-${Date.now()}.canvas`;
+                const content = JSON.stringify(canvasData, null, 2);
+
+                await this.app.vault.create(fileName, content);
+                new Notice(`Created canvas: ${fileName}`);
+            }
+        });
+
+        this.addCommand({
+            id: 'analyze-canvas',
+            name: 'Analyze Current Canvas',
+            callback: async () => {
+                const file = this.app.workspace.getActiveFile();
+                if (!file || file.extension !== 'canvas') {
+                    new Notice('Please open a canvas file');
+                    return;
+                }
+
+                const content = await this.app.vault.read(file);
+                const canvasData: CanvasData = JSON.parse(content);
+
+                console.log(`Canvas: ${file.name}`);
+                console.log(`Nodes: ${canvasData.nodes.length}`);
+                console.log(`Edges: ${canvasData.edges.length}`);
+
+                // Analyze node types
+                const nodeTypes = canvasData.nodes.reduce((acc, node) => {
+                    acc[node.type] = (acc[node.type] || 0) + 1;
+                    return acc;
+                }, {} as Record<string, number>);
+
+                console.log('Node types:', nodeTypes);
+
+                // List file nodes
+                const fileNodes = canvasData.nodes.filter(
+                    node => node.type === 'file'
+                ) as CanvasFileData[];
+
+                if (fileNodes.length > 0) {
+                    console.log('File nodes:');
+                    fileNodes.forEach(node => {
+                        console.log(`  - ${node.file}`);
+                    });
+                }
+            }
+        });
+
+        this.addCommand({
+            id: 'add-node-to-canvas',
+            name: 'Add Node to Current Canvas',
+            callback: async () => {
+                const file = this.app.workspace.getActiveFile();
+                if (!file || file.extension !== 'canvas') {
+                    new Notice('Please open a canvas file');
+                    return;
+                }
+
+                const content = await this.app.vault.read(file);
+                const canvasData: CanvasData = JSON.parse(content);
+
+                // Add a new text node
+                const newNode: CanvasTextData = {
+                    id: Date.now().toString(),
+                    type: 'text',
+                    text: 'New node added by plugin',
+                    x: Math.random() * 500,
+                    y: Math.random() * 500,
+                    width: 200,
+                    height: 100,
+                    color: '2'
+                };
+
+                canvasData.nodes.push(newNode);
+
+                await this.app.vault.modify(file, JSON.stringify(canvasData, null, 2));
+                new Notice('Node added to canvas');
+            }
+        });
+    }
+}
+```
+
+## Summary
+
+The Obsidian API provides a comprehensive and well-designed interface for extending the Obsidian application through plugins. The primary use cases include creating custom views and editors, implementing specialized file formats and processors, adding automation through commands and event handlers, building data synchronization and import/export tools, and enhancing the markdown editing experience with custom syntax and rendering. The API's event-driven architecture ensures plugins can respond to user actions and file changes in real-time, while the component lifecycle system provides automatic cleanup of resources to prevent memory leaks.
+
+Integration with Obsidian follows clear patterns: plugins extend the base Plugin class and use the App instance to access all core functionality, views extend the View or ItemView classes to create custom panes, settings are managed through PluginSettingTab with automatic UI generation, and markdown processing happens through post-processors that transform rendered HTML. The API maintains consistency across desktop and mobile platforms while providing explicit markers for platform-specific features. Type safety is enforced throughout with comprehensive TypeScript definitions, making it straightforward to build robust plugins that integrate deeply with Obsidian's architecture while maintaining stability and performance.

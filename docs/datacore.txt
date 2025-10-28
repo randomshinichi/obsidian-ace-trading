@@ -1,0 +1,3468 @@
+### Datacore: Create Table View for Game Pages
+
+Source: https://blacksmithgu.github.io/datacore/quickstart
+
+This snippet shows how to create a table view in Datacore to display specific pages, in this case, pages tagged with '#game'. It defines the columns for the table, including page name and rating, and uses the `dc.Table` component to render the queried pages. This example illustrates fetching and displaying structured data.
+
+```jsx
+// A list of columns to show in the table.
+const COLUMNS = [
+    { id: "Name", value: page => page.$link },
+    { id: "Rating", value: page => page.value("rating") }
+];
+
+return function View() {
+    // Selecting `#game` pages, for example.
+    const pages = dc.useQuery("@page and #game");
+
+    // Uses the built in table component for showing objects in a table!
+    return <dc.Table columns={COLUMNS} rows={pages} />;
+}
+```
+
+--------------------------------
+
+### Datacore: Display Page Count in React View
+
+Source: https://blacksmithgu.github.io/datacore/quickstart
+
+This snippet demonstrates a basic Datacore view that displays the total number of markdown pages in an Obsidian vault. It utilizes the `dc.useQuery` hook to fetch all pages and returns a simple React component to render the count. This is a foundational example for creating dynamic content within Datacore.
+
+```jsx
+// All datacore views should return a React component; in practice, this is going to be
+return function View() {
+    const pages = dc.useQuery("@page").length;
+
+    return <p>You have {pages} pages in your vault!</p>;
+}
+```
+
+--------------------------------
+
+### Basic dc.Table Usage with Rows and Columns
+
+Source: https://blacksmithgu.github.io/datacore/code-views/table
+
+Demonstrates the fundamental setup of a `dc.Table` component. It requires `rows` for the data and `columns` to define the table structure. Each column needs a unique `id` and a `value` function to extract data from a row. The example shows fetching data with `dc.useQuery` and passing it to the table.
+
+```javascript
+const COLUMNS = [
+    {
+        // A unique ID which identifies this specific column.
+        id: "link",
+        // The value to show in the column.
+        value: (row) => row.$link
+    },
+    { id: "Rating", value: (row) => row.value("rating") },
+    { id: "Genre", value: (row) => row.value("genre") }
+]
+
+return function View() {
+    // Start by fetching your data via a query.
+    const data = dc.useQuery("#book and @page");
+
+    // Pass the full data to `rows`, along with your columns.
+    return <dc.Table rows={data} columns={COLUMNS} />;
+}
+
+```
+
+--------------------------------
+
+### Table View - Basic Usage
+
+Source: https://blacksmithgu.github.io/datacore/code-views/table
+
+Demonstrates the basic setup of a Datacore Table View using 'rows' and 'columns'.
+
+```APIDOC
+## Table View - Basic Usage
+
+### Description
+This section covers the fundamental usage of the `dc.Table` component, focusing on the essential `rows` and `columns` props.
+
+### Code Example
+```javascript
+const COLUMNS = [
+    { id: "link", value: (row) => row.$link },
+    { id: "Rating", value: (row) => row.value("rating") },
+    { id: "Genre", value: (row) => row.value("genre") }
+]
+
+return function View() {
+    // Fetch all books and then group them by genre.
+    const books = dc.useQuery("#book and @page");
+    const booksByGenre = dc.useArray(books, array => array.groupBy(book => book.value("genre")));
+
+    // Basic table rendering with rows and columns.
+    return <dc.Table rows={booksByGenre} columns={COLUMNS} />;
+}
+```
+```
+
+--------------------------------
+
+### Markdown Metadata Example
+
+Source: https://blacksmithgu.github.io/datacore/data
+
+Demonstrates the structure of a simple markdown file with frontmatter properties and tags, which Datacore indexes.
+
+```markdown
+---
+length: 35 hours
+rating: 10
+time-played: 2013-06-10
+---
+# Dark Souls
+
+#game, #game/hard
+
+The game that eventually lead to [[Dark Souls 2]] and [[Elden Ring]]!
+
+```
+
+--------------------------------
+
+### Using Full Search Results with Debounce (datacorejsx)
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+Illustrates using `dc.useFullQuery()` to get detailed search results, including query information and execution duration. This example also configures a debounce interval.
+
+```datacorejsx
+const bookResult = dc.useFullQuery("#book and @page", { debounce: 10000 });
+```
+
+--------------------------------
+
+### Datacore Query Expressions Examples
+
+Source: https://blacksmithgu.github.io/datacore/data/query
+
+Shows how to use Datacore's expression evaluation for flexible filtering. Examples include numerical comparisons, checking for field existence, and string containment within object properties.
+
+```javascript
+// Find all objects with a rating field that is 9 or greater.
+rating >= 9
+
+// Find all sections which have a name NOT equal to 'Daily'.
+@section and $name != "Daily"
+
+// Find all sections whose name contains `Daily`.
+@section and $name.contains("Daily")
+```
+
+--------------------------------
+
+### YAML Datablock Example
+
+Source: https://blacksmithgu.github.io/datacore/data/blocks
+
+Demonstrates a YAML datablock, annotated with 'yaml:data'. Datablocks allow for direct querying of their data using specific fields. This example shows a simple key-value pair.
+
+```yaml
+key: value
+key2: value2
+```
+
+--------------------------------
+
+### Javascript Datacore Field Access Examples
+
+Source: https://blacksmithgu.github.io/datacore/data/fields
+
+Provides examples of using the Javascript `fields` API in Datacore to access frontmatter and inline fields. Demonstrates loading the 'rating' field and accessing the raw, unparsed value of a 'complex-date' field.
+
+```JavaScript
+// Load the 'rating' field from the current page.  
+dc.currentFile().value("rating")  
+
+// Get the raw, unparsed value of a field from frontmatter.  
+dc.currentFile().field("complex-date").raw  
+```
+
+--------------------------------
+
+### Querying Data with Debounce (datacorejsx)
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+Demonstrates how to use the `dc.useQuery()` hook to fetch data based on a query string. This example includes setting a debounce configuration to limit the update frequency.
+
+```datacorejsx
+const books = dc.useQuery("#book and @page", { debounce: 10000 });
+```
+
+--------------------------------
+
+### Check if String Starts With Prefix
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Determines if a string begins with a specified prefix. Returns a boolean value. Supports postfix notation.
+
+```datacore
+startswith("yes", "ye") = true
+startswith("path/to/something", "path/") = true
+startswith("yes", "no") = false
+
+// Postfix style.
+"yes".startswith("no") = false
+```
+
+--------------------------------
+
+### Datacore Query Examples for Fields
+
+Source: https://blacksmithgu.github.io/datacore/data/fields
+
+Demonstrates referencing fields directly in Datacore queries. Supports case-insensitive field names and intrinsic fields prefixed with '$'. Uses the 'row' implicit variable for fields with spaces.
+
+```Datacore Query
+// References the 'rating' field directly.  
+@page and rating >= 7  
+
+// You can also reference intrinsic fields (fields prefixed with `$`):  
+@block and $tags.contains("#test")  
+
+// Use the implicit 'row' in order to handle fields with spaces in their names:  
+@section and row["last reviewed"] >= date(now) - dur(7d)  
+```
+
+--------------------------------
+
+### Datacore Childof() and Subtree() Examples
+
+Source: https://blacksmithgu.github.io/datacore/data/query
+
+Demonstrates `childof()` to retrieve children of matched objects and `subtree()` to include both children and the matched objects. These are complementary to `parentof()` and `supertree()` for hierarchical navigation.
+
+```javascript
+// Return all sections, blocks, etc that are children of markdown pages.
+childof(@page)
+
+// Return page objects and all of the sections, blocks, etc in them.
+subtree(@page)
+```
+
+--------------------------------
+
+### JSON Codeblock Example
+
+Source: https://blacksmithgu.github.io/datacore/data/blocks
+
+An example of a JSON codeblock, which can be defined using backticks. It shows how to represent JSON data within a codeblock. The `$languages` field can specify 'json'.
+
+```json
+{ "a codeblock": "with some stuff in it" }
+```
+
+--------------------------------
+
+### Configuring Paging Options in dc.List
+
+Source: https://blacksmithgu.github.io/datacore/code-views/list
+
+Provides examples of how to control paging behavior in dc.List. This includes explicitly disabling paging, enabling it with default page size, and setting a specific page size.
+
+```javascript
+// Explicitly disable paging.  
+<dc.List paging={false} ... />  
+
+// Enable paging, with the page size equal to your default page size in the Datacore settings.  
+<dc.List paging={true} ... />  
+
+// Enable paging with the specific page size.  
+<dc.List paging={10} ... />
+```
+
+--------------------------------
+
+### Datacore Parentof() and Sugertree() Examples
+
+Source: https://blacksmithgu.github.io/datacore/data/query
+
+Illustrates the use of `parentof()` to find parents of matched objects and `supertree()` to include both parents and the matched objects themselves. These functions are useful for hierarchical data searches.
+
+```javascript
+// Find all pages that contain datacore codeblocks.
+@page and parentof(@codeblock and $languages.contains("datacorejs"))
+
+// Find pages which have `Daily` sections.
+@page and parentof(@section and $name = "Daily")
+
+// Return all of the parent sections/pages of codeblocks.
+parentof(@codeblock)
+
+// Return the parent sections and pages of codeblocks, and the codeblocks themselves.
+supertree(@codeblock)
+```
+
+--------------------------------
+
+### Datacore Task Block Example
+
+Source: https://blacksmithgu.github.io/datacore/data/blocks
+
+Illustrates task list items, which are a subtype of list items and are queryable using `@task`. Tasks include additional fields like `$status` and `$completed` to denote their state.
+
+```markdown
+- [ ] An uncompleted task.
+- [?] A questionable task.
+    - [X] A completed task.
+```
+
+--------------------------------
+
+### Getting Current File Path with Debounce (datacorejsx)
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+Shows how to use the `dc.useCurrentPath()` hook to get the path of the current file in a Datacore view. The example includes setting a debounce interval for updates.
+
+```datacorejsx
+const path = dc.useCurrentPath({ debounce: 10000 });
+```
+
+--------------------------------
+
+### Get Link Metadata: Embed Status
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Determines if a link is an embed. Embed links start with an exclamation mark (!). Dependencies: `meta`. Input: link (string or WikiLink object). Output: boolean (true if embed, false otherwise).
+
+```javascript
+meta(link).embed 
+```
+
+--------------------------------
+
+### Fetching Data with dc.useQuery() in Datacore
+
+Source: https://blacksmithgu.github.io/datacore/code-views
+
+This example shows how to fetch data using the `dc.useQuery()` hook within a Datacore JSX codeblock. It queries for pages tagged '#game' with a 'rating' greater than 7 and displays the count of matching games. `dc.useQuery()` returns an array of matching objects.
+
+```datacorejsx
+return function View() { 
+    const games = dc.useQuery("#game and @page and rating > 7"); 
+    return <p>You have written about {games.length} games!</p>; 
+} 
+
+```
+
+--------------------------------
+
+### Datacore YAML Block Example
+
+Source: https://blacksmithgu.github.io/datacore/data/blocks
+
+Shows the format of a YAML block, typically used for frontmatter in markdown files. This data is stored directly in the page's `$frontmatter` property and does not have additional block-specific metadata.
+
+```yaml
+---
+key: value
+key2: value2
+---
+```
+
+--------------------------------
+
+### Processing and Displaying Data with dc.useMemo()
+
+Source: https://blacksmithgu.github.io/datacore/code-views
+
+This example demonstrates processing fetched data within a Datacore JSX codeblock using `dc.useMemo()` for memoization. It fetches all pages tagged '#game', then constructs a histogram of game ratings. The result is then rendered as an unordered list.
+
+```datacorejsx
+return function View() { 
+    // Fetch all pages tagged #game. 
+    const games = dc.useQuery("#game and @page"); 
+
+    // We want to manually construct a histogram of games by the rating we gave them. 
+    const ratingBuckets = dc.useMemo(() => { 
+        const ratings = {}; 
+        for (const game of games) { 
+            if (!game.value("rating")) continue; 
+
+            // Convert all ratings to strings since who knows what people put in metadata these days. 
+            const rating = game.value("rating") + ""; 
+            ratings[rating] = (ratings[rating] ?? 0) + 1; 
+        } 
+
+        return ratings; 
+    }, [games]); 
+
+    // Then show those buckets! 
+    return ( 
+        <ul> 
+            {Object.keys(ratingBuckets).map(rating => ( 
+                <li>Rating {rating}: {ratingBuckets[rating] ?? 0} entries.</li> 
+            ))} 
+        </ul> 
+    ); 
+} 
+
+```
+
+--------------------------------
+
+### Get Link Metadata: Display Text
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Retrieves the display text of a link. Returns null if the link does not have explicit display text. Dependencies: `meta`. Input: link (string or WikiLink object). Output: string (display text) or null.
+
+```javascript
+meta([[2021-11-01|Displayed link text]]).display = "Displayed link text"  
+meta([[2021-11-01]]).display = null  
+```
+
+--------------------------------
+
+### Datacore Paragraph Block Example
+
+Source: https://blacksmithgu.github.io/datacore/data/blocks
+
+Illustrates the structure of a paragraph block in Datacore. Paragraphs consist of contiguous lines of text, and empty lines serve to separate them into distinct blocks. No additional metadata is provided beyond the standard block fields.
+
+```markdown
+A contiguous set of text lines
+is considered a paragraph.
+
+An empty line splits the text up
+into two separate paragraphs.
+```
+
+--------------------------------
+
+### Customize Grouping Headers with Link Rendering (JavaScript)
+
+Source: https://blacksmithgu.github.io/datacore/code-views/table
+
+Illustrates how to customize the rendering of grouping headers in a DataCore Table View using the `groupings` prop with a function. This example converts genre groupings into file links.
+
+```javascript
+const COLUMNS = [
+    { id: "link", value: (row) => row.$link },
+    { id: "Rating", value: (row) => row.value("rating") },
+    { id: "Genre", value: (row) => row.value("genre") }
+]
+
+return function View() {
+    // Fetch all books and then group them by genre.
+    const books = dc.useQuery("#book and @page");
+    const booksByGenre = dc.useArray(books, array => array.groupBy(book => book.value("genre")));
+
+    // Assigns `groupings` to render the grouping headers using custom logic.
+    return <dc.Table rows={booksByGenre} columns={COLUMNS} groupings={(key) => dc.fileLink(key)} />;
+}
+```
+
+--------------------------------
+
+### Get Link Metadata: Path
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Retrieves the path component of a link, excluding any subpath like headings or block IDs. Dependencies: `meta`. Input: link (string or WikiLink object). Output: string (path).
+
+```javascript
+meta([[My Project]]).path = "My Project"  
+meta([[My Project#Next Actions]]).path = "My Project"  
+meta([[My Project#^9bcbe8]]).path = "My Project"  
+```
+
+--------------------------------
+
+### Getting Current File Metadata with Debounce (datacorejsx)
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+Illustrates how to use the `dc.useCurrentFile()` hook to retrieve metadata of the current file within a Datacore view. It also shows how to configure the debounce interval to control update frequency.
+
+```datacorejsx
+const file = dc.useCurrentFile({ debounce: 10000 });
+```
+
+--------------------------------
+
+### Rendering Current File Name (datacorejsx)
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+A simple example of using the `dc.useCurrentFile()` hook to display the name of the current file in a Datacore view. This hook automatically refreshes the view when the file changes.
+
+```datacorejsx
+return function View() {
+    const file = dc.useCurrentFile();
+
+    return <p>Hello, {file.$name}!</p>;
+}
+```
+
+--------------------------------
+
+### Get Type of Object - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Returns the data type of any given object as a string. This is useful for conditional logic and type-specific operations within Datacore.
+
+```Datacore
+typeof(8) => "number"
+typeof("text") => "string"
+typeof([1, 2, 3]) => "array"
+typeof({ a: 1, b: 2 }) => "object"
+typeof(date(2020-01-01)) => "date"
+typeof(dur(8 minutes)) => "duration"
+```
+
+--------------------------------
+
+### Extract a portion of an array - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+The `slice` function returns a shallow copy of a portion of an array. It accepts start and end indices, and can count from the end of the array.
+
+```Datacore
+slice([1, 2, 3, 4, 5], 3) = [4, 5] => All items from given position, 0 as first
+slice(["ant", "bison", "camel", "duck", "elephant"], 0, 2) = ["ant", "bison"] => First two items
+slice([1, 2, 3, 4, 5], -2) = [4, 5] => counts from the end, last two items
+slice(someArray) => a copy of someArray
+
+// Postfix style.
+[1, 2, 3, 4, 5].slice(-2) = [4, 5] => counts from the end, last two items
+```
+
+--------------------------------
+
+### Get the number of items in a list or object (length)
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+The `length` function returns the count of elements in a list or the number of key-value pairs in an object. It can be called using prefix or postfix notation.
+
+```javascript
+length([])
+length([1, 2, 3])
+length({"hello": 1, "goodbye": 2})
+[1, 2, 3].length()
+```
+
+--------------------------------
+
+### YAML Datablock for Exercise Data
+
+Source: https://blacksmithgu.github.io/datacore/data/blocks
+
+An example of a YAML datablock used to track exercise data. It includes fields like 'type', 'date', and nested 'lifts' data. This structure allows for specific querying, such as finding all entries with type 'exercise'.
+
+```yaml
+type: exercise
+date: 2025-01-10
+lifts:
+    squat: 240
+```
+
+--------------------------------
+
+### Map Arrays to Create Lists in JSX
+
+Source: https://blacksmithgu.github.io/datacore/code-views
+
+Explains how to use the `map` function on arrays within JSX to dynamically generate lists or other repeated elements. This example creates an ordered list from an array of numbers.
+
+```jsx
+return function View() {  
+    const data = [1, 2, 3, 4];  
+  
+    return <ol>  
+        {data.map(index => (  
+            <li>{index}</li>  
+        ))}  
+    </ol>;  
+}  
+
+```
+
+--------------------------------
+
+### Execute JavaScript within JSX Interpolation
+
+Source: https://blacksmithgu.github.io/datacore/code-views
+
+Illustrates executing arbitrary JavaScript code within interpolated blocks in JSX. This example accesses file data and extracts the first character of the file name.
+
+```jsx
+return function View() {  
+    const data = dc.useCurrentFile();  
+  
+    return <p>The first character is {data.$name.substring(0, 1)}!</p>  
+}  
+
+```
+
+--------------------------------
+
+### Extract Substring
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Extracts a portion of a string, starting from a specified index and ending at an optional end index. If the end index is omitted, the substring extends to the end of the original string. Supports postfix notation.
+
+```datacore
+substring("hello", 0, 2) = "he"
+substring("hello", 2, 4) = "ll"
+substring("hello", 2) = "llo"
+substring("hello", 0) = "hello"
+
+// Postfix style.
+"hello".substring(0, 2) = "he"
+```
+
+--------------------------------
+
+### Get Link Metadata: Subpath
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Retrieves the subpath of a link. This is the heading text or block ID if the link points to a specific part of a file. Returns null if there is no subpath. Dependencies: `meta`. Input: link (string or WikiLink object). Output: string (subpath) or null.
+
+```javascript
+meta([[My Project#Next Actions]]).subpath = "Next Actions"  
+meta([[My Project#^9bcbe8]]).subpath = "9bcbe8"  
+meta([[My Project]]).subpath = null  
+```
+
+--------------------------------
+
+### Limit Maximum Depth of Hierarchical Lists - JavaScript
+
+Source: https://blacksmithgu.github.io/datacore/code-views/list
+
+Shows how to control the maximum nesting level of a hierarchical list using the `maxChildDepth` prop in `dc.List`. This example limits the display to two levels of children.
+
+```javascript
+return function View() {
+    // Show only at most two levels of children.
+    return <dc.List rows={...} childSource={"items"} maxChildDepth={2} ... />;
+}
+
+```
+
+--------------------------------
+
+### Define Custom Child Source for Hierarchical Lists - JavaScript
+
+Source: https://blacksmithgu.github.io/datacore/code-views/list
+
+Demonstrates how to override the default child detection mechanism (`$children`, `children`) in `dc.List` by using the `childSource` prop. It shows examples of using a single property, a list of properties, or a function to specify the source of child elements.
+
+```javascript
+return function View() {
+    // Provide an alternative property to use.
+    return <dc.List rows={...} childSource={"items"} ... />;
+    // Provide a list of alternative properties.
+    return <dc.List rows={...} childSource={["items", "things"]} ... />;
+    // Provide an arbitrary function.
+    return <dc.List rows={...} childSource={item => item.value("doodads")} ... />;
+}
+
+```
+
+--------------------------------
+
+### dc.Table Column Definition with Render Function
+
+Source: https://blacksmithgu.github.io/datacore/code-views/table
+
+Shows how to customize cell rendering in a `dc.Table` column using the `render` prop. The `render` function accepts the column's value and the entire row, allowing for JSX or interactive elements to be displayed in cells. This example uses `dc.fileLink` for rendering.
+
+```javascript
+{
+    id: "Genre",
+    value: (row) => row.value("genre"),
+    // Render accepts the column value and (optionally) the full row; it can produce arbitrary
+    // renderable values or JSX.
+    render: (value, row) => dc.fileLink(value)
+}
+
+```
+
+--------------------------------
+
+### Fetching Data with useQuery (datacorejsx)
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+A simple Datacore view that uses the `dc.useQuery()` hook to retrieve a list of books matching a specific query and renders them using a `dc.List` component.
+
+```datacorejsx
+return function View() {
+    const books = dc.useQuery("#book and @page");
+
+    return <dc.List rows={books} renderer={book => book.$link} />;
+}
+```
+
+--------------------------------
+
+### Get Link Type with meta() Function
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+The `meta(link).type` function returns the type of a given link. The type can be 'file', 'header', or 'block', depending on whether the link points to an entire file, a heading within a file, or a specific block within a file. This is useful for understanding the context of a link within the Datacore system.
+
+```datacore
+meta([[My Project]]).type = "file"
+meta([[My Project#Next Actions]]).type = "header"
+meta([[My Project#^9bcbe8]]).type = "block"
+```
+
+--------------------------------
+
+### Object Construction - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Shows how to create objects in Datacore using the `object()` constructor and object literal syntax. The `object()` constructor takes alternating keys (strings) and values. Object literals provide a more concise and preferred syntax for creating objects, including empty objects.
+
+```Datacore
+object() // => empty object
+object("a", 6) // => object which maps "a" to 6
+object("a", 4, "c", "yes") // => object which maps a to 4, and c to "yes"
+
+// Object literal syntax:
+{} // => empty object
+{ a: 6 } // object which maps "a" to 6
+{ a: 4, c: "yes" } // a => 4, and c => "yes"
+```
+
+--------------------------------
+
+### Basic Datacore Codeblock View Structure (datacorejsx)
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+Demonstrates the fundamental structure of a Datacore codeblock view using React functional components. It shows how to use the 'dc' API to fetch data and render a list.
+
+```datacorejsx
+return function View() {
+    // Call functions on the datacore API, 'dc'.
+    const data = dc.useQuery("#book");
+
+    // And then return a view, possibly using more datacore API calls.
+    return <dc.List rows={data} renderer={book => book.$link} />;
+}
+```
+
+--------------------------------
+
+### dc.Table Column Definition with Custom Title
+
+Source: https://blacksmithgu.github.io/datacore/code-views/table
+
+Illustrates how to override the default column title (derived from `id`) using the `title` prop in `dc.Table`. The `title` prop can accept a string or JSX, allowing for custom display names or added visual elements in the column header. This example uses an `<h1>` tag for the title.
+
+```javascript
+{
+    id: "Genre",
+    // You can use arbitrary JSX for the title; you can also just use another string if desired.
+    title: (
+        <h1>Genre!</h1>
+    )
+    value: (row) => row.value("genre"),
+}
+
+```
+
+--------------------------------
+
+### Rendering Query Results with dc.List and Custom Renderer
+
+Source: https://blacksmithgu.github.io/datacore/code-views/list
+
+Illustrates fetching data using dc.useQuery and rendering it within a dc.List. The 'renderer' prop customizes how each item is displayed, in this case, by rendering the book's link.
+
+```javascript
+return function View() {
+    // This will give back a set of MarkdownPage objects, which are not useful to render on their own.
+    const books = dc.useQuery("#book and @page");
+
+    // Render books by rendering their links.
+    return <dc.List rows={books} renderer={book => book.$link} />;
+}
+```
+
+--------------------------------
+
+### React Query and Plugin Query Functions
+
+Source: https://blacksmithgu.github.io/datacore/data/query
+
+Demonstrates how to use Datacore's `query` and `useQuery` functions within a React component for live updates or in a plugin context for single-time execution. `useQuery` automatically updates results as they change, while `query` performs a one-time fetch.
+
+```javascript
+// Inside of a react component, watch the results of a query live. Automatically updates
+// whenever the query results change.
+const pages = dc.useQuery("@page");
+
+// In a plugin context or in more advanced usage, you can run a query a single time with `query`.
+const pages = dc.query("@page and rating > 9");
+```
+
+--------------------------------
+
+### Add Datacore API Package (Yarn/npm)
+
+Source: https://blacksmithgu.github.io/datacore/index
+
+These commands demonstrate how to add the Datacore API typings package to your project using either Yarn or npm. This is useful for Obsidian plugins that need to interoperate with Datacore.
+
+```shell
+# Yarn:  
+yarn add @blacksmithgu/datacore  
+```
+
+```shell
+# npm:  
+npm install @blacksmithgu/datacore  
+```
+
+--------------------------------
+
+### Basic Function Usage and Postfix Style - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Demonstrates the standard function call syntax and the postfix calling style in Datacore. Postfix style allows chaining functions by calling them on the object itself, implicitly passing the object as the first argument. This simplifies common operations like string manipulation.
+
+```Datacore
+lower("YES") // -> "yes"
+replace("yes", "e", "a") // -> "yas"
+
+// Postfix style:
+"YES".lower() // Same as lower("YES")
+"YES".lower().replace("e", "a") // Same as replace(lower("YES"), "e", "a")
+```
+
+--------------------------------
+
+### Basic List Rendering with dc.List
+
+Source: https://blacksmithgu.github.io/datacore/code-views/list
+
+Demonstrates the fundamental usage of dc.List by rendering a static array of strings. This is the simplest way to display a list without any special formatting or data fetching.
+
+```javascript
+const ITEMS = ["First", "Second", "Third"];
+
+return function View() {
+    return <dc.List rows={ITEMS} />;
+}
+```
+
+--------------------------------
+
+### Render Basic HTML with JSX
+
+Source: https://blacksmithgu.github.io/datacore/code-views
+
+Demonstrates how to output arbitrary HTML using Javascript JSX syntax, similar to React. This is useful for creating basic UI elements like paragraphs.
+
+```jsx
+return function View() {  
+    return <div>  
+        <p>Hello!</p>  
+        <p>Goodbye!</p>  
+    </div>;  
+}  
+
+```
+
+--------------------------------
+
+### List Construction - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Demonstrates the creation of lists in Datacore using the `list()` constructor and list literal syntax. `array` is an alias for `list`. Both methods allow for the creation of lists with specified elements or empty lists. List literals are generally preferred for their conciseness.
+
+```Datacore
+list() // => empty list
+list(1, 2, 3) // => list with 1, 2, and 3
+array("a", "b", "c") // => list with "a", "b", and "c"
+
+// List literal syntax:
+[] // => empty list
+[1, 2, 3] // => list with 1, 2, and 3
+```
+
+--------------------------------
+
+### Link Construction - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Describes the `link()` function in Datacore for creating link objects. It takes a file path or name and an optional display name. The function can also be used in postfix style, creating a link to the specified page.
+
+```Datacore
+link("Hello") // => link to page named 'Hello'
+link("Hello", "Goodbye") // => link to page named 'Hello', displays as 'Goodbye'
+
+// Postfix style:
+"Hello".link() // => link to page named 'Hello'
+```
+
+--------------------------------
+
+### Create Data Array Directly with dc.array
+
+Source: https://blacksmithgu.github.io/datacore/code-views/data-array
+
+Illustrates how to directly create a DataArray using the `dc.array` utility function. It shows chaining operations like `map` and `limit` on the DataArray, and how to convert it back to a regular array using the `.array()` method.
+
+```javascript
+return function View() {
+    // da is a `DataArray`.
+    const da = dc.array([1, 2, 3]);
+    // da2 is still a `DataArray`.
+    const da2 = da.map(x => x + 4).limit(2);
+
+    // To get a regular array back, use `.array()`.
+    const data = da2.array();
+}
+```
+
+--------------------------------
+
+### Pad String on the Left
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Adds padding characters to the beginning of a string until it reaches a specified length. If no padding character is provided, spaces are used by default. Supports postfix notation.
+
+```datacore
+padleft("hello", 7) = "  hello"
+padleft("yes", 5, "!") = "!!yes"
+
+// Postfix style.
+"yes".padleft(5, "!") = "!!yes"
+```
+
+--------------------------------
+
+### Format Number as Currency
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Presents a number as a currency string, formatted according to the user's locale and a specified ISO 4217 currency code. Supports postfix notation. Input: number (number), currency code (string, optional). Output: formatted currency string.
+
+```javascript
+number = 123456.789  
+currencyformat(number, "EUR") =  €123,456.79   // in locale: en_US  
+currencyformat(number, "EUR") =  123.456,79 €  // in locale: de_DE  
+currencyformat(number, "EUR") =  € 123 456,79  // in locale: nb  
+  
+// Postfix format.  
+number.currencyformat("EUR") =  € 123 456,79  // in locale: nb  
+```
+
+--------------------------------
+
+### Rendering Current File Path (datacorejsx)
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+A basic Datacore view demonstrating the use of `dc.useCurrentPath()` to display the path of the current file. The view updates automatically when the file changes.
+
+```datacorejsx
+return function View() {
+    const path = dc.useCurrentPath();
+
+    return <p>The file is at {path}!</p>;
+}
+```
+
+--------------------------------
+
+### Vectorization of Functions - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Illustrates Datacore's function vectorization capability, where any argument can be replaced by a list. The function then operates on each element of the list, returning a list of results. This can be combined with the postfix calling style for concise operations on list elements.
+
+```Datacore
+lower(["YES", "NO"]) // -> ["yes", "no"]
+["YES", "NO"].lower() // vectorization + postfix calling style.
+```
+
+--------------------------------
+
+### Datacore Expression Language Syntax Reference
+
+Source: https://blacksmithgu.github.io/datacore/expressions
+
+Provides a comprehensive reference for Datacore's expression language syntax, including literals, lambdas, references, arithmetic, comparison, string operations, and special expressions. This is foundational for writing queries and scripts.
+
+```datacore-expressions
+// Literals  
+1                   (number)  
+true/false          (boolean)  
+"text"              (text)  
+date(2021-04-18)    (date)  
+dur(1 day)          (duration)  
+[[Link]]            (link)  
+[1, 2, 3]           (list)  
+{ a: 1, b: 2 }      (object)  
+  
+// Lambdas  
+(x1, x2) => ...     (lambda)  
+  
+// References  
+field               (directly refer to a field)  
+simple-field        (refer to fields with spaces/punctuation in them like "Simple Field!")  
+a.b                 (if a is an object, retrieve field named 'b')  
+a[expr]             (if a is an object or array, retrieve field with name specified by expression 'expr')  
+f(a, b, ...)        (call a function called `f` on arguments a, b, ...)  
+a.f(b, c, ...)      (postfix function syntax; equivalent to f(a, b, c, ...))  
+  
+// Arithmetic  
+a + b               (addition)  
+a - b               (subtraction)  
+a * b               (multiplication)  
+a / b               (division)  
+a % b               (modulo / remainder of division)  
+  
+// Comparison  
+a > b               (check if a is greater than b)  
+a < b               (check if a is less than b)  
+a = b               (check if a equals b)  
+a != b              (check if a does not equal b)  
+a <= b              (check if a is less than or equal to b)  
+a >= b              (check if a is greater than or equal to b)  
+  
+// Strings  
+a + b               (string concatenation)  
+a * num             (repeat string <num> times)  
+  
+  
+// Special Operations  
+[[Link]].value      (fetch `value` from page `Link`)  
+```
+
+--------------------------------
+
+### Embed Link Creation - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Illustrates the `embed()` function in Datacore, which converts a link object into an embedded link. Embedded links are rendered as Obsidian embeds when possible, while standard links are displayed as clickable text. The function supports postfix notation.
+
+```Datacore
+embed(link("Hello.png")) => embedded link to the "Hello.png" image, which will render as an actual image.
+
+// Postfix style:
+link("Hello.png").embed()
+```
+
+--------------------------------
+
+### Create External Link - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Constructs an HTML link element to an external URL. Accepts an optional second argument for the display text of the link. Can also be used in a postfix style.
+
+```Datacore
+elink("www.google.com") => link element to google.com
+elink("www.google.com", "Google") => link element to google.com, displays as "Google"
+
+// Postfix style:  
+"www.google.com".elink()
+```
+
+--------------------------------
+
+### Displaying Full Search Result Data (datacorejsx)
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+Shows how to utilize the `dc.useFullQuery()` hook to access comprehensive search result data, such as query duration and the list of results, within a Datacore view.
+
+```datacorejsx
+return function View() {
+    // Only allow the view to update every 10000ms (aka, 10 seconds).
+    const bookResult = dc.useFullQuery("#book and @page", { debounce: 10000 });
+
+    return <dc.Stack>
+        <p>The search took {bookResult.duration.toFixed(2)}s to run.</p>
+        <dc.List rows={bookResult.results} renderer={book => book.$link} />
+    </dc.Stack>;
+}
+```
+
+--------------------------------
+
+### Map array elements using a function - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+The `map` function applies a given function to each element of an array and returns a new array with the results. It supports standard and postfix invocation.
+
+```Datacore
+map([1, 2, 3], (x) => x + 2) = [3, 4, 5]
+map(["yes", "no"], (x) => x + "?") = ["yes?", "no?"]
+
+// Postfix style.
+["yes", "no"].map((x) => x + "?") = ["yes?", "no?"]
+```
+
+--------------------------------
+
+### Table View - Paging
+
+Source: https://blacksmithgu.github.io/datacore/code-views/table
+
+Details the 'paging' and 'scrollOnPaging' props for enabling and configuring pagination in the Datacore Table View.
+
+```APIDOC
+## Table View - Paging (`paging` / `scrollOnPaging`)
+
+### Description
+This section explains how to implement and control pagination in the Datacore Table View using the `paging` and `scrollOnPaging` props.
+
+### Method
+`<dc.Table paging={...} scrollOnPaging={...} />`
+
+### Parameters
+#### Prop: `paging`
+- **paging** (boolean | number) - Optional - If set to a boolean, enables or disables paging. If set to a number, paging will be enabled with the given number of rows per page.
+
+#### Prop: `scrollOnPaging`
+- **scrollOnPaging** (boolean | number) - Optional - Whether the view will scroll to the top automatically on page changes. If true, will always scroll on page changes. If a number, will scroll only if the number is greater than the current page size.
+
+### Usage
+```javascript
+// Example enabling paging with 10 rows per page and always scrolling on page change:
+// return <dc.Table rows={data} columns={COLUMNS} paging={10} scrollOnPaging={true} />;
+
+// Example disabling scroll on paging unless page size is exceeded:
+// return <dc.Table rows={data} columns={COLUMNS} paging={true} scrollOnPaging={50} />;
+```
+```
+
+--------------------------------
+
+### Table View - Columns Reference
+
+Source: https://blacksmithgu.github.io/datacore/code-views/table
+
+Provides a detailed reference for the `TableColumn` interface, including properties like 'id', 'value', 'render', 'title', and 'width'.
+
+```APIDOC
+## Table View - Columns Reference (`TableColumn`)
+
+### Description
+This section provides the full reference for the `TableColumn` interface, outlining the properties used to define columns in the Datacore Table View.
+
+### Interface: `TableColumn<T, V = Literal>`
+
+#### Properties
+- **id** (string) - Required - The unique ID of this table column; you cannot have multiple columns with the same ID in a given table.
+- **title** (string | ReactNode | (() => string | ReactNode)) - Optional - The title which will display at the top of the column if present.
+- **width** ("minimum" | "maximum" | string) - Optional - If present, the CSS width to apply to the column. 'minimum' will set the column size to its smallest possible value, while 'maximum' will do the opposite.
+- **value** ((object: T) => V) - Required - Value function which maps the row to the value being rendered.
+- **render** ((value: V, object: T) => Literal | ReactNode) - Optional - Called to render the given column value. Can depend on both the specific value and the row object.
+
+### Usage Examples
+
+**Cell Rendering (`render`):**
+```javascript
+// Example of a custom render function for a 'link' column
+const COLUMNS = [
+    {
+        id: "link",
+        value: (row) => row.$link,
+        render: (linkValue, row) => <a href={linkValue}>View Details</a>
+    }
+]
+```
+
+**Title Rendering (`title`):**
+```javascript
+// Example of a custom title for a column
+const COLUMNS = [
+    {
+        id: "name",
+        title: "User Name", // Simple string title
+        value: (row) => row.name
+    },
+    {
+        id: "status",
+        title: () => <strong>Status</strong>, // Function returning ReactNode
+        value: (row) => row.status
+    }
+]
+```
+
+**Column Width (`width`):**
+```javascript
+const COLUMNS = [
+    {
+        id: "id",
+        width: "minimum", // Set to minimum possible width
+        value: (row) => row.id
+    },
+    {
+        id: "description",
+        width: "50%", // Set to a specific percentage
+        value: (row) => row.description
+    },
+    {
+        id: "notes",
+        width: "maximum", // Set to maximum possible width
+        value: (row) => row.notes
+    }
+]
+```
+```
+
+--------------------------------
+
+### Date Parsing - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Explains how to parse dates in Datacore using the `date()` function. It can parse various inputs including strings and other date/link objects. A second overload allows parsing dates from text using a specified format string, leveraging Luxon tokens. Postfix style is also supported.
+
+```Datacore
+date("2020-04-18") // = <date object representing April 18th, 2020>
+date([[2021-04-16]]) // = <date object for the given page, referring to file.day>
+
+// Postfix style:
+"2020-04-18".date()
+
+// With format:
+date("12/31/2022", "MM/dd/yyyy") => DateTime for December 31th, 2022
+date("210313", "yyMMdd") => DateTime for March 13th, 2021
+date("946778645000", "x") => DateTime for "2000-01-02T03:04:05"
+
+// Postfix style with format:
+"210313".date("yyMMdd") = DateTime for March 13th, 2021
+```
+
+--------------------------------
+
+### Rendering Block List with dc.embed Renderer
+
+Source: https://blacksmithgu.github.io/datacore/code-views/list
+
+Shows how to render a list of blocks using dc.List with the 'block' type and the 'dc.embed' renderer. This is suitable for displaying related content with minimal list formatting.
+
+```javascript
+return function View() {
+    // Fetch all blocks referencing a specific tag.
+    const notes = dc.useQuery("#life-notes and @block");
+
+    // Render the notes as embeds in block format for minimal formatting.
+    return <dc.List type="block" rows={notes} renderer={dc.embed} />;
+}
+```
+
+--------------------------------
+
+### Data Array Indexing and Swizzling
+
+Source: https://blacksmithgu.github.io/datacore/code-views/data-array
+
+Explains and demonstrates the indexing and swizzling capabilities of DataArrays. It shows how to access fields directly (e.g., `data.$name`) to retrieve lists of specific properties from the array elements, including handling nested arrays.
+
+```javascript
+const data = dc.array(dc.query("#books and @page"));
+
+data.$name // => List of all book names.
+data.$ctime // => List of all book created times.
+```
+
+--------------------------------
+
+### Execute Datacore Queries Safely with tryFullQuery
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+The `dc.tryFullQuery` function executes a Datacore query and returns a `Result` object, which indicates success or failure without throwing an exception. This is useful for handling potentially invalid queries gracefully. It accepts a query string and returns a structured object containing the query results or an error message.
+
+```javascript
+dc.tryFullQuery("@page") => {  
+    successful: true,  
+    value: {  
+        // Parsed query representation.  
+        query: { type: "type", type: "page" },  
+        // Actual results, like you would get from `dc.query`.  
+        results: [/* list of pages */],  
+        // Query runtime in seconds, accurate to the millisecond.  
+        duration: 0.01,  
+        // Index revision the query was executed against.  
+        revision: 317,  
+    }  
+}  
+  
+dc.tryFullQuery("malformed(@page)") => {  
+    successful: false,  
+    error: "malformed query ...",  
+}
+```
+
+--------------------------------
+
+### dc.Table Paging Configuration
+
+Source: https://blacksmithgu.github.io/datacore/code-views/table
+
+Demonstrates how to enable and configure pagination for `dc.Table` using the `paging` prop. Pagination can be explicitly disabled (`false`), enabled with the default page size (`true`), or set to a specific number of items per page.
+
+```javascript
+// Explicitly disable paging.
+<dc.Table paging={false} ... />
+
+// Enable paging, with the page size equal to your default page size in the Datacore settings.
+<dc.Table paging={true} ... />
+
+// Enable paging with the specific page size.
+<dc.Table paging={10} ... />
+
+```
+
+--------------------------------
+
+### Datacore Query: Find project pages linking to a coworker
+
+Source: https://blacksmithgu.github.io/datacore/data/query
+
+This query searches for pages tagged as '#project' that have outgoing links to any page identified as '[[Coworker]]'. It demonstrates filtering by tag and identifying specific link targets.
+
+```Datacore
+@page and #project and linksto([[Coworker]])  
+
+```
+
+--------------------------------
+
+### Ordered List Rendering with dc.List
+
+Source: https://blacksmithgu.github.io/datacore/code-views/list
+
+Shows how to create an ordered (numbered) list using the 'type' prop of dc.List. This is useful for sequential items where explicit numbering is desired.
+
+```javascript
+const ITEMS = ["First", "Second", "Third"];
+
+return function View() {
+    return <dc.List type="ordered" rows={ITEMS} />;
+}
+```
+
+--------------------------------
+
+### Basic JSX Component with Datacore
+
+Source: https://blacksmithgu.github.io/datacore/code-views
+
+This snippet demonstrates the most basic Datacore JSX codeblock. It renders a simple paragraph element. Datacore JSX codeblocks must return a React Component, typically defined using `return function View()`. These components can utilize `preact` for rendering.
+
+```datacorejsx
+return function View() { 
+    return <p>Hello!</p>; 
+} 
+
+```
+
+--------------------------------
+
+### Inject Data into JSX Views
+
+Source: https://blacksmithgu.github.io/datacore/code-views
+
+Shows how to insert dynamic data into JSX views using curly braces `{}` for interpolation. It fetches data using `dc.useCurrentFile()` and displays a file path.
+
+```jsx
+return function View() {  
+    const data = dc.useCurrentFile();  
+  
+    return <p>The file you are on is "{data.$path}".</p>;  
+}  
+
+```
+
+--------------------------------
+
+### Create Datacore File Links with dc.fileLink
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+The `dc.fileLink` function creates a Datacore `Link` object from a file path. It automatically handles the conversion to Obsidian link format when rendered. While it accepts local or absolute paths, using absolute paths is recommended for clarity.
+
+```javascript
+dc.fileLink("Test.md") = // Link object representing [[Test]].  
+```
+
+--------------------------------
+
+### Datacore Try Query
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+The dc.tryQuery method is similar to dc.query but returns a datacore Result object instead of raising an exception on malformed queries. This allows for more controlled error handling.
+
+```javascript
+dc.tryQuery("@page") // => { successful: true, value: [/* list of pages */] }
+```
+
+```javascript
+dc.tryQuery("fakefunction(@page)") // => { successful: false, error: "malformed query..." }
+```
+
+--------------------------------
+
+### Datacore Metadata Structure
+
+Source: https://blacksmithgu.github.io/datacore/data
+
+Illustrates how Datacore represents the metadata for a markdown page, including intrinsic fields (prefixed with '$') and frontmatter properties.
+
+```json
+{
+    "$name": "Dark Souls",
+    "$path": "games/Dark Souls.md",
+    "$tags": ["#game", "#game/hard"],
+    "$links": [{ "path": "games/Dark Souls 2.md" }, { "path": "games/Elden Ring.md" }],
+    "$types": ["page", "markdown", "file", "taggable", "linkable"],
+    "$frontmatter": {
+        "length": "35 hours",
+        "rating": 10,
+        "time-played": "2013-06-10"
+    },
+    "/** ... many more fields ... */"
+}
+```
+
+--------------------------------
+
+### Datacore Query: Negate a query (e.g., not tagged 'book')
+
+Source: https://blacksmithgu.github.io/datacore/data/query
+
+This demonstrates the negation operator '!' in Datacore, which finds all objects that do not match the subsequent query. It includes a performance tip to keep queries specific, like '!#book and @block'.
+
+```Datacore
+!#book
+
+```
+
+```Datacore
+!#book and @block
+
+```
+
+--------------------------------
+
+### Rendering Embeds with dc.List and Paging
+
+Source: https://blacksmithgu.github.io/datacore/code-views/list
+
+Demonstrates using dc.List to render embeds of blocks, with paging enabled for performance. The 'renderer' is set to 'dc.embed' for automatic embed rendering, and 'paging' is set to true.
+
+```javascript
+return function View() {
+    const data = dc.useQuery("#important-note and @block");
+
+    // Uses `dc.embed` to render an embed of all of the given blocks, with paging for performnace.
+    return <dc.List rows={data} paging={true} renderer={dc.embed} />;
+}
+```
+
+--------------------------------
+
+### Import and Use Shared Code with dc.require
+
+Source: https://blacksmithgu.github.io/datacore/code-views
+
+Demonstrates how to import and use a shared code snippet (like the `ListItem` component) from another file using `dc.require`. It destructures the imported component and uses it in a view.
+
+```javascript
+const { ListItem } = await dc.require(dc.headerLink("scripts/lists.md", "ListItem"));  
+  
+return function View() {  
+    return <ListItem text="whoa!" />;  
+}  
+
+```
+
+--------------------------------
+
+### Datacore Full Query
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+The dc.fullquery method executes a query and returns the results along with additional metadata, including the parsed query, query duration, and the index revision used. This is useful for performance analysis and debugging.
+
+```javascript
+dc.fullquery("@page") // => {
+    // Parsed query representation.
+    query: { type: "type", type: "page" },
+    // Actual results, like you would get from `dc.query`.
+    results: [/* list of pages */],
+    // Query runtime in seconds, accurate to the millisecond.
+    duration: 0.01,
+    // Index revision the query was executed against.
+    revision: 317,
+}
+```
+
+--------------------------------
+
+### Table View - Grouping
+
+Source: https://blacksmithgu.github.io/datacore/code-views/table
+
+Explains how to configure and customize data grouping in the Datacore Table View using the 'groupings' prop.
+
+```APIDOC
+## Table View - Grouping (`groupings`)
+
+### Description
+This section details how to use the `groupings` prop to customize the rendering of grouping headers in the Datacore Table View. It supports both function-based and `GroupingConfig` object configurations.
+
+### Method
+`<dc.Table groupings={...} />`
+
+### Parameters
+#### Prop: `groupings`
+- **groupings** (GroupingConfig<T> | GroupingConfig<T>[] | ((key: Literal, rows: Grouping<T>) => Literal | ReactNode)) - Optional - Allows for grouping header columns to be overridden with custom rendering/logic.
+
+### Code Examples
+
+**1. Using a function for custom rendering:**
+```javascript
+const COLUMNS = [
+    { id: "link", value: (row) => row.$link },
+    { id: "Rating", value: (row) => row.value("rating") },
+    { id: "Genre", value: (row) => row.value("genre") }
+]
+
+return function View() {
+    const books = dc.useQuery("#book and @page");
+    const booksByGenre = dc.useArray(books, array => array.groupBy(book => book.value("genre")));
+
+    // Assigns `groupings` to render the grouping headers using custom logic.
+    return <dc.Table rows={booksByGenre} columns={COLUMNS} groupings={(key) => dc.fileLink(key)} />;
+}
+```
+
+**2. Using a `GroupingConfig` object:**
+```javascript
+const LINK_GROUPING = {
+    render: (key, rows) => dc.fileLink(key)
+};
+
+const COLUMNS = [
+    { id: "link", value: (row) => row.$link },
+    { id: "Rating", value: (row) => row.value("rating") },
+    { id: "Genre", value: (row) => row.value("genre") }
+]
+
+return function View() {
+    const books = dc.useQuery("#book and @page");
+    const booksByGenre = dc.useArray(books, array => array.groupBy(book => book.value("genre")));
+
+    // Assigns `groupings` to render the grouping headers using custom logic.
+    return <dc.Table rows={booksByGenre} columns={COLUMNS} groupings={LINK_GROUPING} />;
+}
+```
+
+**3. Using an array of configurations for multiple grouping levels:**
+*If you group multiple times, you can specify a separate rendering for each grouping level by passing an array of grouping configurations to `groupings`.*
+```javascript
+// Example for multiple groupings (syntax specific to how the array is structured)
+// const multiGroupings = [GROUPING_CONFIG_LEVEL_1, GROUPING_CONFIG_LEVEL_2];
+// return <dc.Table rows={groupedData} columns={COLUMNS} groupings={multiGroupings} />;
+```
+```
+
+--------------------------------
+
+### Group Data by Genre with Table View (JavaScript)
+
+Source: https://blacksmithgu.github.io/datacore/code-views/table
+
+Demonstrates how to fetch book data and group it by genre using Data Array syntax for rendering in a DataCore Table View. No extra configuration is needed for default group rendering.
+
+```javascript
+const COLUMNS = [
+    { id: "link", value: (row) => row.$link },
+    { id: "Rating", value: (row) => row.value("rating") },
+    { id: "Genre", value: (row) => row.value("genre") }
+]
+
+return function View() {
+    // Fetch all books and then group them by genre.
+    const books = dc.useQuery("#book and @page");
+    const booksByGenre = dc.useArray(books, array => array.groupBy(book => book.value("genre")));
+
+    // No extra configuration is required by default to show groups.
+    return <dc.Table rows={booksByGenre} columns={COLUMNS} />;
+}
+```
+
+--------------------------------
+
+### Accessing Inline Fields with Datacore
+
+Source: https://blacksmithgu.github.io/datacore/data/sections
+
+Demonstrates how to access inline fields associated with sections in Datacore. This includes direct referencing in queries and using the `section.value()` method in JavaScript.
+
+```datcore-query
+@section and row["last reviewed"] > date(now) - dur(7d)
+```
+
+```javascript
+section.value("last reviewed")
+```
+
+--------------------------------
+
+### String Conversion - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Explains the `string()` function in Datacore, which converts any value into a string representation. This is particularly useful for coercing non-string types like dates, durations, and numbers into strings for further manipulation. Postfix style is available.
+
+```Datacore
+string(18) = "18"
+string(dur(8 hours)) = "8 hours"
+string(date(2021-08-15)) = "August 15th, 2021"
+
+// Postfix style:
+18.string() = "18"
+```
+
+--------------------------------
+
+### Group Data by Genre with File Link Headers - JavaScript
+
+Source: https://blacksmithgu.github.io/datacore/code-views/list
+
+Groups books by genre and customizes the rendering of group headers to display them as file links using the 'groupings' prop with a function. This allows for more interactive or informative group titles.
+
+```javascript
+return function View() {
+    // Fetch all books and then group them by genre.
+    const books = dc.useQuery("#book and @page");
+    const booksByGenre = dc.useArray(books, array => array.groupBy(book => book.value("genre")));
+
+    // Render each grouping key as a file link instead of just text.
+    return <dc.List rows={booksByGenre} renderer={book => book.$link} groupings={(key) => dc.fileLink(key)} />;
+}
+
+```
+
+--------------------------------
+
+### Querying Markdown Pages with Datacore
+
+Source: https://blacksmithgu.github.io/datacore/data/pages
+
+This snippet demonstrates how to query markdown pages using Datacore's query language. It shows direct field referencing and accessing nested properties within fields like 'row'.
+
+```datacore
+@page and rating >= 7
+@page and row["spaced field"].contains("thing")
+```
+
+--------------------------------
+
+### Create and Process Data Array with dc.useArray
+
+Source: https://blacksmithgu.github.io/datacore/code-views/data-array
+
+Demonstrates the creation of a DataArray using the `dc.useArray` hook. It takes an array, sorts and groups it by genre, and returns a processed DataArray suitable for rendering. This is the most common method for data array processing within Datacore.
+
+```javascript
+return function View() {
+    // Start with some data you want to process...
+    const books = dc.useQuery("#books and @page");
+    // Use `dc.useArray` to get a data array for processing.
+    const groupedBooks = dc.useArray(books, array =>
+        array.sort(book => book.$name)
+             .groupBy(book => book.value("genre")));
+
+    // Then render it.
+    return <dc.List rows={groupedBooks} />;
+}
+```
+
+--------------------------------
+
+### Group Data by Genre with Explicit Grouping Config - JavaScript
+
+Source: https://blacksmithgu.github.io/datacore/code-views/list
+
+Groups books by genre and utilizes an explicit `GroupingConfig` object passed to the 'groupings' prop to render group headers as file links. This provides a structured way to define grouping rendering logic.
+
+```javascript
+const LINK_GROUPING = {
+    render: (key, rows) => dc.fileLink(key)
+};
+
+return function View() {
+    // Fetch all books and then group them by genre.
+    const books = dc.useQuery("#book and @page");
+    const booksByGenre = dc.useArray(books, array => array.groupBy(book => book.value("genre")));
+
+    // Render each grouping key as a file link instead of just text.
+    return <dc.List rows={booksByGenre} renderer={book => book.$link} groupings={LINK_GROUPING} />;
+}
+
+```
+
+--------------------------------
+
+### Querying Block Fields in Datacore
+
+Source: https://blacksmithgu.github.io/datacore/data/blocks
+
+Demonstrates how to reference block fields directly in queries and expressions, and how to access them using a field API in JavaScript. This allows for dynamic filtering and data retrieval based on block properties.
+
+```plaintext
+@block and genre = "Fantasy"
+@block and row["last reviewed"] > date(now) - dur(7d)
+```
+
+```javascript
+block.value("last reviewed")
+```
+
+--------------------------------
+
+### Pad String on the Right
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Adds padding characters to the end of a string until it reaches a specified length. If no padding character is provided, spaces are used by default. Supports postfix notation.
+
+```datacore
+padright("hello", 7) = "hello  "
+padright("yes", 5, "!") = "yes!!"
+
+// Postfix style.
+"yes".padright(5, "!") = "yes!!"
+```
+
+--------------------------------
+
+### Create Datacore Block Links with dc.blockLink
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+The `dc.blockLink` function creates a Datacore `Link` to a specific block within a file, provided the block has a unique ID (indicated by `^blockId` notation). This is useful for referencing precise sections of content.
+
+```javascript
+dc.blockLink("Daily Thoughts.md", "38ha12d") = // equivalent to [[Daily Thoughts#^38ha12d]]  
+```
+
+--------------------------------
+
+### Create Datacore Header Links with dc.headerLink
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+Use `dc.headerLink` to generate a Datacore `Link` object that points to a specific header within a file. This function takes the file name and the header title as arguments, producing a link equivalent to the standard Obsidian header link format.
+
+```javascript
+dc.headerLink("Terraria.md", "Review") = // equivalent to [[Terraria#Review]].  
+```
+
+--------------------------------
+
+### Datacore Section JSON Reference
+
+Source: https://blacksmithgu.github.io/datacore/data/sections
+
+Provides a detailed JSON structure representing all metadata available for a Datacore section. This includes types, IDs, file paths, inline fields, and various section-specific properties.
+
+```json
+{
+    "$types": ["markdown", "section", "taggable", "linkable", "links", "fields"],
+    "$typename": "Section",
+    "$id": "<unique id>",
+    "$file": "<path-to-file-containing-section>",
+    "$infields": [
+        "field 1": {
+            key: "field 1",
+            value: "<parsed value>",
+            raw: "<raw unparsed text value>",
+            position: { start: 0, end: 1 }
+        },
+        ...
+    ],
+    "$ordinal": <number>,
+    "$title": "<section title>",
+    "$name": "<section title>",
+    "$level": "<1-6 level of section>",
+    "$lineCount": 1, // Number of lines in the file.
+    // Start and end position of the section in lines. Start position is inclusive; end is exclusive.
+    "$position": { start: 0, end: 1 },
+    "$link": <link-to-file>, // Link object that links to this file.
+    "$tags": ["#tag1", "#tag2/thing"],
+    "$links": [ /* list of Link objects in this section. */ ],
+    "$blocks": [ /* list of blocks in this section. */ ]
+}
+```
+
+--------------------------------
+
+### Convert String to Lowercase
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Converts all characters in a given string to lowercase. This function is vectorized and supports postfix notation.
+
+```datacore
+lower("Test") = "test"
+lower("TEST") = "test"
+
+// Postfix style.
+"Test".lower() = "test"
+```
+
+--------------------------------
+
+### Combine Grouping and Hierarchies for Dynamic Lists - JavaScript
+
+Source: https://blacksmithgu.github.io/datacore/code-views/list
+
+Creates a dynamic list view that combines data grouping and hierarchical display. It groups books by genre and recursively lists pages or sections linked to each book, up to a depth of one level.
+
+```javascript
+// Finds all things linked to book that themselves can be linked to.
+function findLinked(book) {
+	return dc.query(`[[${book.$path}]] and $types.econtains("linkable")`);
+}
+
+return function View() {
+    // Groups both by
+    const books = dc.useQuery("@page and #book");
+    const groupedBooks = dc.useArray(books, array => array.groupBy(book => book.value("genre") ?? "No Genre"));
+
+    return <dc.List rows={groupedBooks} renderer={(book) => book.$link} maxChildDepth={1} childSource={findLinked} />;
+}
+
+```
+
+--------------------------------
+
+### Explicit Grouping Configuration for Links (JavaScript)
+
+Source: https://blacksmithgu.github.io/datacore/code-views/table
+
+Shows how to define an explicit `GroupingConfig` object to customize the rendering of grouping headers. This approach is an alternative to passing a function directly to the `groupings` prop, here used to create file links for each group.
+
+```javascript
+const LINK_GROUPING = {
+    render: (key, rows) => dc.fileLink(key)
+};
+
+const COLUMNS = [
+    { id: "link", value: (row) => row.$link },
+    { id: "Rating", value: (row) => row.value("rating") },
+    { id: "Genre", value: (row) => row.value("genre") }
+]
+
+return function View() {
+    // Fetch all books and then group them by genre.
+    const books = dc.useQuery("#book and @page");
+    const booksByGenre = dc.useArray(books, array => array.groupBy(book => book.value("genre")));
+
+    // Assigns `groupings` to render the grouping headers using custom logic.
+    return <dc.Table rows={booksByGenre} columns={COLUMNS} groupings={LINK_GROUPING} />;
+}
+```
+
+--------------------------------
+
+### Convert String to Uppercase
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Converts all characters in a given string to uppercase. This function is vectorized and supports postfix notation.
+
+```datacore
+upper("Test") = "TEST"
+upper("test") = "TEST"
+
+// Postfix style.
+"Test".upper() = "TEST"
+```
+
+--------------------------------
+
+### Accessing File Metadata with Datacore Hooks
+
+Source: https://blacksmithgu.github.io/datacore/code-views
+
+This snippet illustrates using `dc.useCurrentFile()` and `dc.useFile()` to access metadata for the current file and a specific file, respectively. These hooks provide reactive updates whenever the file content or path changes, enabling dynamic display of file information.
+
+```datacorejsx
+return function View() { 
+    // Returns full page metadata for the current file, and updates the view whenever the current 
+    // file changes. 
+    const current = dc.useCurrentFile(); 
+
+    // Returns file metadata for a file at a specific path. 
+    const other = dc.useFile("secret/data.md"); 
+
+    return <p>You are on {current.$path}; you are loading from {other.$path}.</p>; 
+} 
+
+```
+
+--------------------------------
+
+### Datacore Query: Find pages tagged 'game' with rating >= 9
+
+Source: https://blacksmithgu.github.io/datacore/data/query
+
+This query finds all pages tagged with '#game' and filters them to include only those with a 'rating' of 9 or above. It demonstrates basic tag filtering and numerical comparison.
+
+```Datacore
+@page and #game and rating >= 9  
+
+```
+
+--------------------------------
+
+### Group Data by Genre with Default Rendering - JavaScript
+
+Source: https://blacksmithgu.github.io/datacore/code-views/list
+
+Fetches all books and groups them by genre using Data Array's groupBy method. The grouped data is then rendered using a default list renderer. No special configuration is needed for basic group display.
+
+```javascript
+return function View() {
+    // Fetch all books and then group them by genre.
+    const books = dc.useQuery("#book and @page");
+    const booksByGenre = dc.useArray(books, array => array.groupBy(book => book.value("genre")));
+
+    // No extra configuration is required by default to show groups.
+    return <dc.List rows={booksByGenre} renderer={book => book.$link} />;
+}
+
+```
+
+--------------------------------
+
+### Reduce Array with Operand - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Reduces an array to a single value using a specified operand (+, -, *, /). Functions similarly to sum, product, all, and any for respective operands. Supports postfix notation.
+
+```Datacore
+reduce([100, 20, 3], "-") = 77
+reduce([200, 10, 2], "/") = 10
+reduce(values, "*") = Multiplies every element of values, same as product(values)
+reduce(values, this.operand) = Applies the local field operand to each of the values
+reduce(["⭐", 3], "*") = "⭐⭐⭐", same as "⭐" * 3
+
+reduce([1]), "+") = 1, has the side effect of reducing the list into a single element
+
+// Postfix style.  
+[1].reduce("+")
+```
+
+--------------------------------
+
+### Format Date with Custom String
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Formats a date or datetime object into a string according to a specified format. It uses Luxon tokens for formatting. Note: The output is a string, not a date object, so comparisons require formatting both sides. Dependencies: `date`. Input: date (Date object), format string (string). Output: formatted date string.
+
+```javascript
+dateformat(file.ctime,"yyyy-MM-dd") = "2022-01-05"  
+dateformat(file.ctime,"HH:mm:ss") = "12:18:04"  
+dateformat(date(now),"x") = "1407287224054"  
+dateformat(file.mtime,"ffff") = "Wednesday, August 6, 2014, 1:07 PM Eastern Daylight Time"  
+```
+
+--------------------------------
+
+### Datacore JSON Reference for Markdown Page Metadata
+
+Source: https://blacksmithgu.github.io/datacore/data/pages
+
+A comprehensive JSON structure detailing all available metadata for a markdown page tracked by Datacore. This includes system-derived fields and user-defined frontmatter/inline fields.
+
+```json
+{
+    "$types": ["file", "markdown", "page", "taggable", "linkable", "links", "fields"],
+    "$typename": "Page",
+    "$id": "<path-to-file>",
+    "$file": "<path-to-file>",
+    "$frontmatter": [
+        "key 1": {
+            "key": "key 1",
+            "value": "<parsed value>",
+            "raw": "<raw unparsed text value>"
+        },
+        ...
+    ],
+    "$infields": [
+        "field 1": {
+            "key": "field 1",
+            "value": "<parsed value>",
+            "raw": "<raw unparsed text value>",
+            "position": { "start": 0, "end": 1 }
+        },
+        ...
+    ],
+    "$path": "<path-to-file>",
+    "$ctime": "<unix epoch seconds when file was created>",
+    "$mtime": "<unix epoch seconds when file was last modified>",
+    "$extension": "<file extension - usually 'md'>",
+    "$size": "<size of file in bytes>",
+    "$position": { "start": 0, "end": 1 },
+    "$tags": ["#tag1", "#tag2/thing"],
+    "$links": [ /* list of Link objects in this page. */ ],
+    "$sections": [ /* list of sections in this page. */ ],
+
+    /** Derived Fields. */
+    "$lineCount": 1, // Number of lines in the file.
+    "$name": "File Name", // Name of the file as it would show up in Obsidian.
+    "$link": <link-to-file> // Link object that links to this file.
+}
+```
+
+--------------------------------
+
+### Generate Hash with Seed, Text, and Variant
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Generates a fixed numeric hash based on a seed, optional text, and an optional variant number. This is useful for randomizing sort orders of files or lists. The uniqueness can be enhanced by including timestamps or line numbers as text or variant. Dependencies: `dateformat`, `date`, `today`. Input: seed (string), text (string, optional), variant (number, optional). Output: number.
+
+```javascript
+hash(dateformat(date(today), "YYYY-MM-DD"), file.name) = ... A unique value for a given date in time  
+hash(dateformat(date(today), "YYYY-MM-DD"), file.name, position.start.line) = ... A unique "random" value in a TASK query  
+```
+
+--------------------------------
+
+### Join array elements into a string - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+The `join` function concatenates array elements into a single string, optionally using a specified delimiter. It handles single elements and empty arrays correctly.
+
+```Datacore
+join([1, 2, 3]) = "1, 2, 3"
+join([1, 2, 3], " ") = "1 2 3"
+join(6) = "6"
+join([]) = ""
+
+// Postfix style.
+[1, 2, 3].join(" ") = "1 2 3"
+```
+
+--------------------------------
+
+### Reverse the order of elements in a list (reverse)
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+The `reverse` function returns a new list with the elements in the opposite order of the original list. It is available in both prefix and postfix styles.
+
+```javascript
+reverse([1, 2, 3])
+reverse(["a", "b", "c"])
+["a", "b", "c"].reverse()
+```
+
+--------------------------------
+
+### Resolve File Paths with dc.resolvePath
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+The `dc.resolvePath` function resolves a given file path to an absolute path. It can resolve by file name, from a specified source path, or return the input path unchanged if the file is not found. This utility is essential for consistent path handling within Datacore.
+
+```javascript
+// Can resolve by file name.  
+dc.resolvePath("Test") = "location/To/Test.md"  
+// Can resolve from an alternative source path, in case there are multiple `Test` files.  
+dc.resolvePath("Test", "utils/Index.md") = "utils/Test.md"  
+// If it cannot find the file, returns the input path unchanged.  
+dc.resolvePath("noexist") = "noexist"  
+```
+
+--------------------------------
+
+### Interface for Table View Props (TypeScript)
+
+Source: https://blacksmithgu.github.io/datacore/code-views/table
+
+Defines the TypeScript interface for `TableViewProps`, outlining all available properties for configuring the DataCore Table View component, including columns, rows, grouping, and pagination.
+
+```typescript
+export interface TableViewProps<T> {
+    /** The columns to render in the table. */
+    columns: TableColumn<T>[];
+
+    /** The rows to render; may potentially be grouped or just a plain array. */
+    rows: Grouping<T>;
+
+    /** Allows for grouping header columns to be overridden with custom rendering/logic. */
+    groupings?: GroupingConfig<T> | GroupingConfig<T>[] | ((key: Literal, rows: Grouping<T>) => Literal | ReactNode);
+
+    /** 
+     * If set to a boolean - enables or disables paging.
+     * If set to a number, paging will be enabled with the given number of rows per page. 
+     */
+    paging?: boolean | number;
+
+    /**  
+     * Whether the view will scroll to the top automatically on page changes. If true, will always scroll on page changes.
+     * If a number, will scroll only if the number is greater than the current page size. 
+     **/
+    scrollOnPaging?: boolean | number;
+}
+```
+
+--------------------------------
+
+### Querying Datablocks with JavaScript
+
+Source: https://blacksmithgu.github.io/datacore/data/blocks
+
+JavaScript code for querying Datacore datablocks. It shows how to fetch datablocks that have a specific field (e.g., 'rating') and how to access the value of a field within a datablock.
+
+```javascript
+// Fetch all datablocks which have a 'rating' field.
+const datablocks = dc.query("@datablock and exists(rating)");
+
+// Fetch data specifically from the values in the datablock.
+datablocks[0].value("rating")
+```
+
+--------------------------------
+
+### Split String by Delimiter
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Splits a string into an array of substrings based on a specified delimiter. An optional limit can be provided to control the number of splits. The delimiter is interpreted as a regular expression, and capture groups within the delimiter can affect the resulting array. Supports postfix notation.
+
+```datacore
+split("hello world", " ") = ["hello", "world"]
+split("hello  world", "\s") = ["hello", "world"]
+split("hello there world", " ", 2) = ["hello", "there"]
+split("hello there world", "(t?here)") = ["hello ", "there", " world"]
+split("hello there world", "( )(x)?") = ["hello", " ", "", "there", " ", "", "world"]
+
+// Postfix style.
+"hello there world".split("( )(x)?") = ["hello", " ", "", "there", " ", "", "world"]
+```
+
+--------------------------------
+
+### Datacore ListState Interface Definition (TypeScript)
+
+Source: https://blacksmithgu.github.io/datacore/code-views/list
+
+Defines the properties for configuring a list's state, including its type, data rows, grouping, rendering, paging, scrolling, child depth, and child source. It specifies the structure for ordered, unordered, or block lists and custom rendering logic.
+
+```typescript
+export interface ListState<T> {
+    /**
+     * Whether the list should be ordered, unordered, or block.
+     *
+     * Block lists do not use an actual list element and instead just render a series of contiguous
+     * div elements with no other annotations.
+     */
+    type?: "ordered" | "unordered" | "block";
+
+    /** The full collection of elements in the list. */
+    rows: Grouping<T>;
+
+    /** Allows for grouping header lines to be overridden with custom rendering/logic. */
+    groupings?: GroupingConfig<T> | GroupingConfig<T>[] | ((key: Literal, rows: Grouping<T>) => Literal | VNode);
+
+    /**
+     * Custom render function to use for rendering each leaf element. Can produce either JSX or a plain value which will be
+     * rendered as a literal.
+     */
+    renderer?: (row: T) => React.ReactNode | Literal;
+
+    /** Controls whether paging is enabled for this element. If true, uses default page size. If a number, paging is enabled with the given page size. */
+    paging?: boolean | number;
+
+    /**
+     * Whether the view will scroll to the top automatically on page changes. If true, will always scroll on page changes.
+     * If a number, will scroll only if the number is greater than the current page size.
+     **/
+    scrollOnPaging?: boolean | number;
+
+    /** Maximum level of children that will be rendered; a level of 0 means no children expansion will occur. */
+    maxChildDepth?: number;
+
+    /**
+     * Property name, list of property names, or function to be applied to obtain children for a given entry.
+     * Defaults to the `$children` and `children` props.
+     *
+     * If null, child extraction is disabled and no children will be fetched. If undefined, uses the default.
+     */
+    childSource?: null | string | string[] | ((row: T) => T[]);
+}
+
+export interface GroupingConfig<T> {
+    /** How a grouping with the given key and set of rows should be rendered. */
+    render?: (key: Literal, rows: Grouping<T>) => Literal | VNode;
+}
+
+```
+
+--------------------------------
+
+### Minimum Value - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Computes the minimum value from a list of arguments or an array. Works with numbers and strings.
+
+```Datacore
+min(1, 2, 3) = 1
+min([1, 2, 3]) = 1
+
+min("a", "ab", "abc") = "a"
+```
+
+--------------------------------
+
+### Safely Parse Datacore Links with dc.tryParseLink
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+Similar to `dc.parseLink`, `dc.tryParseLink` parses a string link into a Datacore `Link` object. However, instead of throwing an error on malformed syntax, it returns a `Result` object, indicating success or failure with an error message if applicable.
+
+```javascript
+dc.tryParseLink("[[Test]]") = // { successful: true, value: [[Test]] }  
+dc.tryParseLink("[malformed]") = // { successful: false, error: "malformed input..." }  
+```
+
+--------------------------------
+
+### Define Reusable Snippet for dc.require
+
+Source: https://blacksmithgu.github.io/datacore/code-views
+
+Shows how to define a reusable code snippet that can be imported by other scripts using `dc.require`. The codeblock returns an object containing the exported `ListItem` function.
+
+```jsx
+# ListItem  
+  
+```jsx  
+function ListItem({ text }) {  
+    return <li>Some text: {text}</li>;  
+}  
+  
+// The return is important here - dc.require literally calls this code as a function and yields  
+// whatever this codeblock returns. If you are used to 'import'-style includes in modern ECMAScript,  
+// this may look a bit weird.  
+return { ListItem };  
+```  
+
+```
+
+--------------------------------
+
+### Coerce String to Link - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+Parses strings into link objects. Returns undefined for inputs that cannot be parsed as links. Handles standard wiki-style links and embedded links with display text.
+
+```javascript
+dc.coerce.link("[[Test]]") = // Link to 'Test'  
+dc.coerce.link("![[Embed|Display]]") = // Embedded link to 'Embed' with display 'Display'.  
+dc.coerce.link("oof") = undefined  
+```
+
+--------------------------------
+
+### Minimum Value by Function - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Finds the minimum value in an array based on the result of a provided function applied to each element. Supports postfix notation.
+
+```Datacore
+minby([1, 2, 3], (k) => k) = 1
+minby([1, 2, 3], (k) => 0 - k) => 3
+
+minby(this.file.tasks, (k) => k.due) => (earliest due)
+
+// Postfix style.  
+this.file.tasks.minby((k) => k.due) => (earliest due)
+```
+
+--------------------------------
+
+### Split Complex Views into Components
+
+Source: https://blacksmithgu.github.io/datacore/code-views
+
+Demonstrates how to break down large or complicated JSX views into smaller, reusable functions (components). This improves code organization and maintainability, as shown with the `ListItem` component.
+
+```jsx
+function ListItem({ text }) {  
+    return <li>Some text: {text}</li>;  
+}  
+  
+return function View() {  
+    return <ul>  
+        <ListItem text="text!" />  
+        <ListItem text="more text!" />  
+        <ListItem text="even more text!" />  
+    </ul>;  
+}  
+
+```
+
+--------------------------------
+
+### Extract specific fields from an object (extract)
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+The `extract` function creates a new object containing only the specified fields from an original object. It can be used in both prefix and postfix styles.
+
+```javascript
+extract(file, "$ctime", "$mtime")
+file.extract("$ctime", "$mtime")
+```
+
+--------------------------------
+
+### Interface for Grouping Configuration (TypeScript)
+
+Source: https://blacksmithgu.github.io/datacore/code-views/table
+
+Defines the TypeScript interface for `GroupingConfig`, used to customize how grouping headers are rendered in a DataCore Table View. It includes a `render` function for custom logic.
+
+```typescript
+export interface GroupingConfig<T> {
+    /** How a grouping with the given key and set of rows should be handled. */
+    render?: (key: Literal, rows: Grouping<T>) => Literal | ReactNode;
+}
+```
+
+--------------------------------
+
+### Sort a list numerically or alphabetically (sort)
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+The `sort` function returns a new list with the elements arranged in ascending order. It works for both numbers and strings and supports postfix notation.
+
+```javascript
+sort([3, 2, 1])
+sort(["a", "b", "aa"])
+["a", "b", "aa"].sort()
+```
+
+--------------------------------
+
+### dc.Table Column Definition with Fixed Width
+
+Source: https://blacksmithgu.github.io/datacore/code-views/table
+
+Explains how to set a specific width for a column in `dc.Table` using the `width` prop. This allows for more control over table layout, overriding the default HTML sizing algorithm. The `width` can be specified in pixels or percentages.
+
+```javascript
+{
+    id: "Genre",
+    width: "50%",
+    value: (row) => row.value("genre"),
+}
+
+```
+
+--------------------------------
+
+### SearchResult Interface Definition (TypeScript)
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+Defines the TypeScript interface for `SearchResult`, which is returned by the `dc.useFullQuery` hook. It includes properties for the query, results, duration, and revision.
+
+```typescript
+export interface SearchResult<O> {
+    /** The query used to search. */
+    query: IndexQuery;
+    /** All of the returned results. */
+    results: O[];
+    /** The amount of time in seconds that the search took. */
+    duration: number;
+    /** The maximum revision of any document in the result, which is useful for diffing. */
+    revision: number;
+}
+```
+
+--------------------------------
+
+### Product of Array Elements - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Calculates the product of all numeric values within an array. Null values can be excluded using the `nonnull` function. Supports postfix notation.
+
+```Datacore
+product([1,2,3]) = 6
+product([]) = null
+
+product(nonnull([null, 1, 2, 4])) = 8
+
+// Postfix style:  
+[1, 2, 3].product() = 6
+```
+
+--------------------------------
+
+### Number Extraction - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Details the `number()` function in Datacore, which extracts the first numerical value from a given string. If the input is already a number, it is returned directly. It returns null if no number is found in the string. Postfix style is also supported.
+
+```Datacore
+number("18 years") = 18
+number(34) = 34
+number("hmm") = null
+
+// Postfix style.
+"18 years".number() = 18
+```
+
+--------------------------------
+
+### Interface for Table Column Configuration (TypeScript)
+
+Source: https://blacksmithgu.github.io/datacore/code-views/table
+
+Defines the TypeScript interface for `TableColumn`, specifying the properties required to configure individual columns within a DataCore Table View, including ID, title, width, value extraction, and custom rendering.
+
+```typescript
+export interface TableColumn<T, V = Literal> {
+    /** The unique ID of this table column; you cannot have multiple columns with the same ID in a given table. */
+    id: string;
+
+    /** The title which will display at the top of the column if present. */
+    title?: string | ReactNode | (() => string | ReactNode);
+
+    /** If present, the CSS width to apply to the column. 'minimum' will set the column size to it's smallest possible value, while 'maximum' will do the opposite. */
+    width?: "minimum" | "maximum" | string;
+
+    /** Value function which maps the row to the value being rendered. */
+    value: (object: T) => V;
+
+    /** Called to render the given column value. Can depend on both the specific value and the row object. */
+    render?: (value: V, object: T) => Literal | ReactNode;
+}
+```
+
+--------------------------------
+
+### Evaluate Datacore Expressions with dc.evaluate
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+The `dc.evaluate` function evaluates Datacore expressions and returns their results. It supports single-argument expressions, expressions with variables, and expressions with a specified source path for link resolution. Invalid expressions will raise an exception.
+
+```javascript
+// Single argument version takes only the expression.  
+dc.evaluate("1 + 2") = 3  
+  
+// Two argument version allows you to provide variables.  
+dc.evaluate("x + y", { x: 1, y: 2 }) = 3  
+  
+// Three argument version allows you to specify a source path to resolve  
+// links from, if you don't want to use the current file.  
+dc.evaluate("[[Test]].value", {}, "path/to/other/file.md") = // the value of property 'value' in [[Test]]  
+```
+
+--------------------------------
+
+### Maximum Value by Function - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Finds the maximum value in an array based on the result of a provided function applied to each element. Supports postfix notation.
+
+```Datacore
+maxby([1, 2, 3], (k) => k) = 3
+maxby([1, 2, 3], (k) => 0 - k) => 1
+
+maxby(this.file.tasks, (k) => k.due) => (latest due)
+
+// Postfix style.  
+this.file.tasks.maxby((k) => k.due) => (latest due)
+```
+
+--------------------------------
+
+### Maximum Value - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Computes the maximum value from a list of arguments or an array. Works with numbers and strings.
+
+```Datacore
+max(1, 2, 3) = 3
+max([1, 2, 3]) = 3
+
+max("a", "ab", "abc") = "abc"
+```
+
+--------------------------------
+
+### Datacore Direct Query
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+The dc.query method executes a query against the datacore index and returns a list of all matched results. It will raise an exception if the query is malformed. This method does not trigger view updates on its own; it should be combined with dc.useIndexUpdates for re-rendering.
+
+```javascript
+dc.query("@page") // => list of all pages
+```
+
+```javascript
+dc.query("@page and #book and rating > 7") // => all pages tagged book with a rating higher than 7.
+```
+
+--------------------------------
+
+### Match entire string with regex pattern - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+The `regexmatch` function checks if a regular expression pattern matches the entire string. This differs from `regextest` by requiring a full string match.
+
+```Datacore
+regexmatch("\\w+", "hello") = true
+regexmatch(".", "a") = true
+regexmatch("yes|no", "maybe") = false
+regexmatch("what", "what's up dog?") = false
+```
+
+--------------------------------
+
+### Datacore Use Array Hook
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+The dc.useArray hook processes a regular JavaScript array using Datacore's data array utilities. It accepts the array, a function to apply to it, and an optional dependency array. This is useful for leveraging data array functionalities while maintaining compatibility with standard JavaScript arrays.
+
+```javascript
+return function View() {
+    const pages = dc.useQuery("@page and #book");
+    const grouped = dc.useArray(pages, array => array.groupBy(book => book.value("genre")));
+
+    return <dc.List rows={grouped} renderer={book => book.$link} />
+}
+```
+
+```javascript
+const [searchTerm, setSearchTerm] = dc.useState("");
+const pages = dc.useQuery("@page and #book");
+
+const filteredPages = dc.useArray(
+    pages,
+    array => array.filter(book => book.$title.includes(searchTerm)),
+    [searchTerm]);
+```
+
+--------------------------------
+
+### Datacore Use Index Updates Hook
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+The dc.useIndexUpdates hook returns the current revision of the datacore index. This is useful for triggering re-renders when the index changes, especially when using direct dc.query calls. It accepts an optional settings object for configuration, such as setting a debounce interval.
+
+```javascript
+return function View() {
+    // Revision will update on every index update.
+    const revision = dc.useIndexUpdates();
+
+    // Run some complex query that will be re-run on every revision update.
+    const complexQuery = dc.useMemo(() => {
+        const thing = dc.query(/* ... */);
+        // ...
+    }, [revision]);
+}
+```
+
+```javascript
+// Only update at most once every ten seconds.
+const revision = dc.useIndexUpdates({ debounce: 10000 });
+```
+
+--------------------------------
+
+### Datacore List Item Structure
+
+Source: https://blacksmithgu.github.io/datacore/data/blocks
+
+Defines the structure of a list item, which can be a regular list item or a task. List items are queryable via `@list-item` and possess properties like type, position, line number, tags, links, and parent information.
+
+```markdown
+- Regular list item.
+- Another regular list item.
+    - A sublist item.
+```
+
+--------------------------------
+
+### Truncate String with Optional Suffix
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Shortens a string to a maximum specified length. An optional suffix (defaulting to '...') is appended if the string is truncated. This is useful for displaying truncated text in tables. Supports postfix notation.
+
+```datacore
+truncate("Hello there!", 8) = "Hello..."
+truncate("Hello there!", 8, "/") = "Hello t/"
+truncate("Hello there!", 10) = "Hello t..."
+truncate("Hello there!", 10, "!") = "Hello the!"
+truncate("Hello there!", 20) = "Hello there!"
+
+// Postfix style.
+"Hello there!".truncate(8) = "Hello..."
+```
+
+--------------------------------
+
+### Safely Evaluate Datacore Expressions with dc.tryEvaluate
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+The `dc.tryEvaluate` function evaluates Datacore expressions and returns a `Result` object containing either the evaluated value or an error message. This provides a safer alternative to `dc.evaluate` for handling potentially invalid expressions without exceptions.
+
+```javascript
+dc.tryEvaluate("1 + 2") = { value: 3, successful: true }  
+dc.tryEvaluate("fakefunction(3)") = { successful: false, error: "unrecognized function..." }  
+```
+
+--------------------------------
+
+### Conditional Choice (If-Else)
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Acts as a simple if-else statement. If the first argument (a boolean expression) is truthy, it returns the second argument (left); otherwise, it returns the third argument (right).
+
+```datacore
+choice(true, "yes", "no") = "yes"
+choice(false, "yes", "no") = "no"
+choice(x > 4, y, z) = y if x > 4, else z
+```
+
+--------------------------------
+
+### Parse Datacore Links with dc.parseLink
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+The `dc.parseLink` function parses a string representation of a link into a Datacore `Link` object. It will throw an error if the provided link syntax is malformed. This is useful for validating and converting link strings.
+
+```javascript
+dc.parseLink("[[Test]]") = // link representing [[Test]].  
+dc.parseLink("[malformed]") = // throws an exception  
+```
+
+--------------------------------
+
+### Replace Substrings in a String
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Replaces all occurrences of a specified pattern within a string with a replacement string. The pattern is treated as a regular expression. This function is vectorized and also supports postfix notation.
+
+```datacore
+replace("what", "wh", "h") = "hat"
+replace("The big dog chased the big cat.", "big", "small") = "The small dog chased the small cat."
+replace("test", "test", "no") = "no"
+
+// Postfix style.
+"The big dog chased the big cat.".replace("big", "small") = "The small dog chased the small cat."
+```
+
+--------------------------------
+
+### Format Duration with Custom String
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Formats a duration into a string using a provided format string. Supports tokens for milliseconds, seconds, minutes, hours, days, weeks, months, and years. Durations can also be formatted using postfix notation. Dependencies: `dur`. Input: duration (Duration object), format string (string). Output: formatted duration string.
+
+```javascript
+durationformat(dur("3 days 7 hours 43 seconds"), "ddd'd' hh'h' ss's'") = "003d 07h 43s"  
+durationformat(dur("365 days 5 hours 49 minutes"), "yyyy ddd hh mm ss") = "0001 000 05 49 00"  
+durationformat(dur("2000 years"), "M months") = "24000 months"  
+durationformat(dur("14d"), "s 'seconds'") = "1209600 seconds"  
+
+// Postfix format.  
+dur("14d").durationformat("s 'seconds'") = "1209600 seconds"  
+```
+
+--------------------------------
+
+### Coerce Values to String with dc.coerce.string
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+The `dc.coerce.string()` function converts any given value into its string representation. This utility is useful for ensuring data is in string format for various operations or display purposes.
+
+```javascript
+dc.coerce.string(16) = "16"  
+dc.coerce.string(true) = "true"  
+```
+
+--------------------------------
+
+### Controlling Scroll Behavior on Page Change in dc.List
+
+Source: https://blacksmithgu.github.io/datacore/code-views/list
+
+Demonstrates the 'scrollOnPaging' prop in dc.List, which manages scroll position when navigating between pages. It can be set to 'true' to always scroll to the top or a number to scroll only if the previous page had a certain number of entries.
+
+```javascript
+// Always scroll to the top of the view when the page changes.  
+<dc.List scrollOnPaging={true} ... />  
+
+// Only scroll to the top of the page if the old page had at least 10 entries.  
+<dc.List scrollOnPaging={10} ... />
+```
+
+--------------------------------
+
+### Filter array elements based on predicate - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+The `filter` function creates a new array containing only elements that satisfy the provided predicate function. It supports both prefix and postfix usage.
+
+```Datacore
+filter([1, 2, 3], (x) => x >= 2) = [2, 3]
+filter(["yes", "no", "yas"], (x) => startswith(x, "y")) = ["yes", "yas"]
+
+// Postfix style.
+["yes", "no", "yas"].filter((x) => startswith(x, "y")) = ["yes", "yas"]
+```
+
+--------------------------------
+
+### Test regex pattern against string - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+The `regextest` function checks if a given regular expression pattern exists within a string using the JavaScript regex engine. It returns true if a match is found, false otherwise.
+
+```Datacore
+regextest("\\w+", "hello") = true
+regextest(".", "a") = true
+regextest("yes|no", "maybe") = false
+regextest("what", "what's up dog?") = true
+```
+
+--------------------------------
+
+### Create Nested List from Hierarchical Data - JavaScript
+
+Source: https://blacksmithgu.github.io/datacore/code-views/list
+
+Renders a hierarchical list structure using the `dc.List` component. The data is provided in a nested format with 'children' properties, and each item is displayed using its 'title' property.
+
+```javascript
+const DATA = [
+    {
+        title: "Hello",
+        children: [
+            { title: "One" },
+            { title: "Two" },
+            { title: "Three" }
+        ]
+    },
+    {
+        title: "Goodbye",
+        children: [
+            { title: "Four" },
+            { title: "Five" },
+            { title: "Six" }
+        ]
+    }
+];
+
+return function View() {
+    return <dc.List rows={DATA} renderer={item => item.title} />;
+}
+
+```
+
+--------------------------------
+
+### Sum Array Elements - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Calculates the sum of all numeric values within an array. Null values can be excluded using the `nonnull` function. Supports postfix notation.
+
+```Datacore
+sum([1, 2, 3]) = 6
+sum([]) = null
+
+sum(nonnull([null, 1, 8])) = 9
+
+// Postfix style:  
+[1, 2, 3].sum() = 6
+```
+
+--------------------------------
+
+### Datacore Query: Find uncompleted tasks in 'Daily' sections
+
+Source: https://blacksmithgu.github.io/datacore/data/query
+
+This query identifies tasks that are not yet completed ('$completed = false') and are located within sections named 'Daily'. It showcases filtering by status and hierarchical relationships using 'childof'.
+
+```Datacore
+@task and $completed = false and childof(@section and $name = "Daily")  
+
+```
+
+--------------------------------
+
+### Coerce Values to Boolean with dc.coerce.boolean
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+The `dc.coerce.boolean()` function parses values into booleans. It specifically recognizes `true` and `false` (case-insensitive) strings as boolean `true`, returning `undefined` for most other input types.
+
+```javascript
+dc.coerce.boolean(true) = true  
+dc.coerce.boolean("true") = true  
+dc.coerce.boolean("blah") = undefined  
+```
+
+--------------------------------
+
+### dc.Table Scroll on Page Configuration
+
+Source: https://blacksmithgu.github.io/datacore/code-views/table
+
+Shows how to control scrolling behavior when changing pages in `dc.Table` using the `scrollOnPaging` prop. This prop can be set to `true` to always scroll to the top, a number to scroll only if the previous page had at least that many entries, or omitted to retain scroll position.
+
+```javascript
+// Always scroll to the top of the view when the page changes.
+<dc.Table scrollOnPaging={true} ... />
+
+// Only scroll to the top of the page if the old page had at least 10 entries.
+<dc.Table scrollOnPaging={10} ... />
+
+```
+
+--------------------------------
+
+### Accessing Page Fields in Javascript with Datacore
+
+Source: https://blacksmithgu.github.io/datacore/data/pages
+
+This snippet illustrates how to access typed fields of a markdown page from within Javascript using Datacore's `page.value()` API. This method is case-insensitive.
+
+```javascript
+page.value("rating") => 7
+page.value("genre") => "Fantasy"
+```
+
+--------------------------------
+
+### Average Array Elements - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Computes the arithmetic average of numeric values in an array. Null values can be excluded using the `nonnull` function. Supports postfix notation.
+
+```Datacore
+average([1, 2, 3]) = 2
+average([]) = null
+
+average(nonnull([null, 1, 2])) = 1.5
+
+// Postfix style.  
+[1, 2, 3].average() = 2
+```
+
+--------------------------------
+
+### Convert Date to Local Timezone
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Converts a date object from a fixed timezone to the current system's timezone. Useful for displaying dates and times consistently for the user. Dependencies: None. Input: date (Date object). Output: Date object (in local timezone).
+
+```javascript
+localtime(date) 
+```
+
+--------------------------------
+
+### Datacore List Block Structure
+
+Source: https://blacksmithgu.github.io/datacore/data/blocks
+
+Represents a list block, which can contain regular list items or task items. These blocks are queryable using `@block-list` and have a `$elements` field containing the individual list items.
+
+```markdown
+- Item 1
+- Item 2
+- [ ] Task 1
+- [ ] Task 2
+```
+
+--------------------------------
+
+### Duration Parsing - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Covers the `dur()` function in Datacore for parsing duration values from strings or other duration objects. It returns a duration object or null on failure. The function supports various string formats for durations and can be used with postfix notation.
+
+```Datacore
+dur(8 minutes) = <8 minutes>
+dur("8 minutes, 4 seconds") = <8 minutes, 4 seconds>
+dur(dur(8 minutes)) = dur(8 minutes) = <8 minutes>
+
+// Postfix style:
+"8 minutes, 4 seconds".dur() = <8 minutes, 4 seconds>
+```
+
+--------------------------------
+
+### Coerce Values to Duration with dc.coerce.duration
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+The `dc.coerce.duration()` function parses human-readable duration strings into duration objects. It recognizes various time units like hours and minutes, returning `undefined` for inputs that do not represent a valid duration.
+
+```javascript
+dc.coerce.duration("14 hours") = // <Duration representing 14 hours>  
+dc.coerce.duration("30m") = // <Duration representing 30 minutes>  
+dc.coerce.duration("other text") = undefined  
+```
+
+--------------------------------
+
+### Replace pattern in string with regex - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+The `regexreplace` function replaces all occurrences of a regex pattern within a string with a specified replacement. It supports capture groups for complex replacements.
+
+```Datacore
+regexreplace("yes", "[ys]", "a") = "aea"
+regexreplace("Suite 1000", "\\d+", "-") = "Suite -"
+```
+
+--------------------------------
+
+### Provide Default Value for Null Fields
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Returns a specified default value if the input field is null; otherwise, returns the field's value. This function is vectorized for both arguments. For non-vectorized list arguments, `ldefault` should be used.
+
+```datacore
+default(dateCompleted, "incomplete")
+
+default([1, 2, null], 3) = [1, 2, 3]
+ldefault([1, 2, null], 3) = [1, 2, null]
+```
+
+--------------------------------
+
+### Ceiling Number - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Rounds a number up to the smallest integer greater than or equal to it. For negative numbers, this results in a less negative value.
+
+```Datacore
+ceil(12.937) = 13
+ceil(-93.33333) = -93
+ceil(-0.837764) = 0
+```
+
+--------------------------------
+
+### Datacore Field Interface Definition
+
+Source: https://blacksmithgu.github.io/datacore/data/fields
+
+Defines the TypeScript interface for a Datacore `Field` object. This interface includes properties for the canonical key name, the parsed value, the raw unparsed value, and optional provenance information.
+
+```TypeScript
+export interface Field {  
+    /** The canonical key name for the field (i.e., as it actually shows up in the data structure). */  
+    key: string;  
+    /** The value of the field. */  
+    value: Literal;  
+    /** The raw value of the field before parsing, if relevant. */  
+    raw?: string;  
+    /** If present, describes where the field came from in precise detail, allowing the field to be edited. */  
+    provenance?: Provenance;  
+}  
+```
+
+--------------------------------
+
+### Coerce Value to Array - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+Ensures the input is an array. If the input is already an array, it is returned as is. Otherwise, the input value is wrapped in a new array.
+
+```javascript
+dc.coerce.array([1, 2]) = [1, 2]  
+dc.coerce.array(1) = [1]  
+```
+
+--------------------------------
+
+### Coerce Values to Date with dc.coerce.date
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+The `dc.coerce.date()` function parses strings into date objects. It supports various date and datetime formats, returning `undefined` if the input string cannot be parsed into a valid date.
+
+```javascript
+dc.coerce.date("2025-05-10") = // <DateTime representing 2025-05-10>  
+dc.coerce.date("2025-05-10T11:12:13") = // <DateTime representing 2025-05-10 at 11:12 (and 13 seconds)>  
+dc.coerce.date("random text") = undefined  
+```
+
+--------------------------------
+
+### Exact value match in string, list, or object (econtains)
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+The `econtains` function performs an exact match check. For strings, it behaves like `contains`. For lists, it checks for an exact word match. For objects, it verifies the exact presence of a key name, without recursive checks.
+
+```javascript
+"Hello".econtains("Lo")
+"Hello".econtains("lo")
+```
+
+```javascript
+["These", "are", "words"].econtains("word")
+["These", "are", "words"].econtains("words")
+```
+
+```javascript
+{key:"value", pairs:"here"}.econtains("here")
+{key:"value", pairs:"here"}.econtains("key")
+{key:"value", recur:{recurkey: "val"}}.econtains("value")
+{key:"value", recur:{recurkey: "val"}}.econtains("Recur")
+{key:"value", recur:{recurkey: "val"}}.econtains("recurkey")
+```
+
+--------------------------------
+
+### Remove null values from an array (nonnull)
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+The `nonnull` function creates a new array by filtering out all `null` values from the input array. It supports both prefix and postfix usage.
+
+```javascript
+nonnull([])
+nonnull([null, false])
+nonnull([1, 2, 3])
+[null, false].nonnull()
+```
+
+--------------------------------
+
+### Check if any element in array is truthy - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+The `any` function returns true if any element in an array is truthy. It can also accept multiple arguments or a predicate function to check for matches.
+
+```Datacore
+any([1, 2, 3]) = true
+any([true, false]) = true
+any([false, false, false]) = false
+any(true, false) = true
+any(false, false) = false
+
+// Postfix style.
+[true, false].any() = true
+
+any([1, 2, 3], (x) => x > 2) = true
+any([1, 2, 3], (x) => x = 0) = false
+
+// Postfix style.
+[1, 2, 3].any((x) => x = 0) = false
+```
+
+--------------------------------
+
+### Check if String Ends With Suffix
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Determines if a string ends with a specified suffix. Returns a boolean value. Supports postfix notation.
+
+```datacore
+endswith("yes", "es") = true
+endswith("path/to/something", "something") = true
+endswith("yes", "ye") = false
+
+// Postfix style.
+"yes".endswith("ye") = false
+```
+
+--------------------------------
+
+### Check for exact word match in string or list (containsword)
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+The `containsword` function checks if a string contains an exact word match, ignoring case. When applied to a list, it processes each element individually. To check if any element in a list matches, combine with the `any` function.
+
+```javascript
+"word".containsword("word")
+"word".containsword("Word")
+"words".containsword("Word")
+"Hello there!".containsword("hello")
+"Hello there!".containsword("HeLLo")
+"Hello there chaps!".containsword("chap")
+"Hello there chaps!".containsword("chaps")
+```
+
+```javascript
+["hello", "hello there", "no"].containsword("hello")
+```
+
+```javascript
+["hello", "hello there", "no"].containsword("hello").any()
+```
+
+--------------------------------
+
+### Reduce Array with Lambda Function - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Reduces an array to a single value by applying a lambda function element by element. Useful for custom aggregations like finding the maximum value in an array.
+
+```Datacore
+reduce([100, 20, 3], (accum, curr) => accum * curr) = 6000 // multiplies elements.  
+
+// Postfix style.  
+[100, 200, 300, 100].reduce((accum, curr) => max(accum, curr)) = 300 // max of an array via reduce.  
+```
+
+--------------------------------
+
+### Round Number - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Rounds a number to a specified number of decimal places. If no digits are specified, it rounds to the nearest whole number.
+
+```Datacore
+round(16.555555) = 17
+round(16.555555, 2) = 16.56
+```
+
+--------------------------------
+
+### Check if no element in array is truthy - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+The `none` function returns true if no element in an array is truthy. It supports predicate functions for conditional checks and postfix notation.
+
+```Datacore
+none([]) = true
+none([false, false]) = true
+none([false, true]) = false
+none([1, 2, 3]) = false
+
+// Postfix style.
+[1, 2, 3].none() = false
+
+none([1, 2, 3], (x) => x = 0) = true
+none([true, true], (x) => x = false) = true
+none(["Apple", "Pi", "Banana"], (x) => startswith(x, "A")) = false
+
+// Postfix style.
+["Apple", "Pi", "Banana"].none((x) => startswith(x, "A")) = false
+```
+
+--------------------------------
+
+### Floor Number - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Rounds a number down to the largest integer less than or equal to it. For negative numbers, this results in a more negative value.
+
+```Datacore
+floor(12.937) = 12
+floor(-93.33333) = -94
+floor(-0.837764) = -1
+```
+
+--------------------------------
+
+### Coerce Values to Number with dc.coerce.number
+
+Source: https://blacksmithgu.github.io/datacore/code-views/local-api
+
+The `dc.coerce.number()` function attempts to parse values into numbers. It successfully converts numeric strings and existing numbers but returns `undefined` for non-numeric strings or other data types.
+
+```javascript
+dc.coerce.number(15) = 15  
+dc.coerce.number("49.2") = 49.2  
+dc.coerce.number("oof") = undefined  
+```
+
+--------------------------------
+
+### Check if all elements in an array are truthy (all)
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+The `all` function returns `true` if all elements in an array are truthy, or if all provided arguments are truthy. It can also accept a predicate function to test each element.
+
+```javascript
+all([1, 2, 3])
+all([true, false])
+all(true, false)
+all(true, true, true)
+[true, true, true].all()
+```
+
+```javascript
+all([1, 2, 3], (x) => x > 0)
+all([1, 2, 3], (x) => x > 1)
+all(["apple", "pie", 3], (x) => typeof(x) = "string")
+["apple", "pie", 3].all((x) => typeof(x) = "string")
+```
+
+--------------------------------
+
+### Truncate Number - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Removes the decimal part of a number, effectively truncating it to its integer part. Works for both positive and negative numbers.
+
+```Datacore
+trunc(12.937) = 12
+trunc(-93.33333) = -93
+trunc(-0.837764) = 0
+```
+
+--------------------------------
+
+### Check if value exists in object, list, or string (contains)
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+The `contains` function checks for the presence of a value within an object (by key), list (as an element), or string (as a substring). This function is case-sensitive. It operates differently based on the type of the first argument.
+
+```javascript
+file.contains("$ctime")
+file.contains("day")
+```
+
+```javascript
+[1, 2, 3].contains(3)
+[].contains(1)
+```
+
+```javascript
+"hello".contains("lo")
+"yes".contains("no")
+```
+
+--------------------------------
+
+### Strip Time Component from Date
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+Removes the time portion from a date object, returning only the year, month, and day. This is useful for comparing dates without considering the time of day. Dependencies: None. Input: date (Date object). Output: Date object (without time).
+
+```javascript
+striptime(file.ctime) = file.cday  
+striptime(file.mtime) = file.mday  
+```
+
+--------------------------------
+
+### Case-insensitive value check in object, list, or string (icontains)
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+The `icontains` function is the case-insensitive version of the `contains` function. It checks for the presence of a value within an object, list, or string without regard to character casing.
+
+--------------------------------
+
+### DataArray TypeScript Interface Definition
+
+Source: https://blacksmithgu.github.io/datacore/code-views/data-array
+
+Defines the TypeScript interface for DataArray, an immutable data structure that provides a rich set of methods for array manipulation. It includes type definitions for array functions and comparators, along with various methods for filtering, mapping, sorting, grouping, and querying.
+
+```typescript
+/** A function which maps an array element to some value. */  
+export type ArrayFunc<T, O> = (elem: T, index: number, arr: T[]) => O;  
+  
+/** A function which compares two types. */  
+export type ArrayComparator<T> = (a: T, b: T) => number;  
+  
+/**  
+ * Proxied interface which allows manipulating array-based data. All functions on a data array produce a NEW array  
+ * (i.e., the arrays are immutable).  
+ */  
+export interface DataArray<T> {  
+    /** The total number of elements in the array. */  
+    length: number;  
+  
+    /** Filter the data array down to just elements which match the given predicate. */  
+    where(predicate: ArrayFunc<T, boolean>): DataArray<T>;  
+    /** Alias for 'where' for people who want array semantics. */  
+    filter(predicate: ArrayFunc<T, boolean>): DataArray<T>;  
+  
+    /** Map elements in the data array by applying a function to each. */  
+    map<U>(f: ArrayFunc<T, U>): DataArray<U>;  
+    /** Map elements in the data array by applying a function to each, then flatten the results to produce a new array. */  
+    flatMap<U>(f: ArrayFunc<T, U[]>): DataArray<U>;  
+    /** Mutably change each value in the array, returning the same array which you can further chain off of. */  
+    mutate(f: ArrayFunc<T, any>): DataArray<any>;  
+  
+    /** Limit the total number of entries in the array to the given value. */  
+    limit(count: number): DataArray<T>;  
+    /**  
+     * Take a slice of the array. If `start` is undefined, it is assumed to be 0; if `end` is undefined, it is assumed  
+     * to be the end of the array.  
+     */  
+    slice(start?: number, end?: number): DataArray<T>;  
+    /** Concatenate the values in this data array with those of another iterable / data array / array. */  
+    concat(other: Iterable<T>): DataArray<T>;  
+  
+    /** Return the first index of the given (optionally starting the search) */  
+    indexOf(element: T, fromIndex?: number): number;  
+    /** Return the first element that satisfies the given predicate. */  
+    find(pred: ArrayFunc<T, boolean>): T | undefined;  
+    /** Find the index of the first element that satisfies the given predicate. Returns -1 if nothing was found. */  
+    findIndex(pred: ArrayFunc<T, boolean>, fromIndex?: number): number;  
+    /** Returns true if the array contains the given element, and false otherwise. */  
+    includes(element: T): boolean;  
+  
+    /**  
+     * Return a string obtained by converting each element in the array to a string, and joining it with the  
+     * given separator (which defaults to ', ').  
+     */  
+    join(sep?: string): string;  
+  
+    /**  
+     * Return a sorted array sorted by the given key; an optional comparator can be provided, which will  
+     * be used to compare the keys in leiu of the default dataview comparator.  
+     */  
+    sort<U>(key: ArrayFunc<T, U>, direction?: "asc" | "desc", comparator?: ArrayComparator<U>): DataArray<T>;  
+  
+    /**  
+     * Return an array where elements are grouped by the given key; the resulting array will have objects of the form  
+     * { key: <key value>, rows: DataArray }.  
+     */  
+    groupBy<U>(key: ArrayFunc<T, U>, comparator?: ArrayComparator<U>): DataArray<{ key: U; rows: DataArray<T> }>;  
+  
+    /**  
+     * Return distinct entries. If a key is provided, then rows with distinct keys are returned.  
+     */  
+    distinct<U>(key?: ArrayFunc<T, U>, comparator?: ArrayComparator<U>): DataArray<T>;  
+  
+    /** Return true if the predicate is true for all values. */  
+    every(f: ArrayFunc<T, boolean>): boolean;  
+    /** Return true if the predicate is true for at least one value. */  
+    some(f: ArrayFunc<T, boolean>): boolean;  
+    /** Return true if the predicate is FALSE for all values. */  
+    none(f: ArrayFunc<T, boolean>): boolean;  
+  
+    /** Return the first element in the data array. Returns undefined if the array is empty. */  
+    first(): T;  
+    /** Return the last element in the data array. Returns undefined if the array is empty. */  
+    last(): T;  
+  
+    /** Map every element in this data array to the given key, and then flatten it.*/  
+    to(key: string): DataArray<any>;  
+    /**  
+     * Recursively expand the given key, flattening a tree structure based on the key into a flat array. Useful for handling  
+     * hierarchical data like tasks with 'subtasks'.  
+     */  
+    expand(key: string): DataArray<any>;  
+  
+    /** Run a lambda on each element in the array. */  
+    forEach(f: ArrayFunc<T, void>): void;  
+  
+    /** Convert this to a plain javascript array. */  
+    array(): T[];  
+  
+    /** Allow iterating directly over the array. */  
+    [Symbol.iterator](): Iterator<T>;  
+  
+    /** Map indexes to values. */  
+    [index: number]: any;  
+    /** Automatic flattening of fields. Equivalent to implicitly calling `array.to("field")` */  
+    [field: string]: any;  
+}
+```
+
+--------------------------------
+
+### Flatten array to a specified depth - Datacore
+
+Source: https://blacksmithgu.github.io/datacore/expressions/functions
+
+The `flat` function concatenates nested array elements up to a specified depth. The default depth is 1. Useful for simplifying nested data structures like `rows`.
+
+```Datacore
+flat([1, 2, 3, [4, 5], 6]) => [1, 2, 3, 4, 5, 6]
+flat([1, [21, 22], [[311, 312, 313]]], 4) => list(1, 21, 22, 311, 312, 313)
+flat(rows.file.outlinks)) => All the file outlinks at first level in output
+
+// Postfix style.
+rows.file.outlinks.flat() => All the file outlinks at first level in output
+```
