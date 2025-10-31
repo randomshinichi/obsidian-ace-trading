@@ -26,7 +26,7 @@ import {
 	computeMetrics,
 } from './helpers';
 import { Action, Side, TradeFrontmatter, Fill } from './schema';
-import { TradePaneView, VIEW_TYPE_TRADE } from './trade-pane';
+import { TradePaneView, VIEW_TYPE_TRADE, TradePaneCallbacks } from './trade-pane';
 
 interface AceTradingSettings {
 	tradesRoot: string;
@@ -226,9 +226,15 @@ export default class AceTradingPlugin extends Plugin {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
 		this.addSettingTab(new AceTradingSettingsTab(this.app, this));
 
+		const callbacks: TradePaneCallbacks = {
+			recompute: (file) => this.recomputeTrade(file, true),
+			addFill: (file) => this.openAddFillModal(file),
+			closeTrade: (file) => this.openCloseTradeModal(file),
+		};
+
 		this.registerView(
 			VIEW_TYPE_TRADE,
-			(leaf: WorkspaceLeaf) => new TradePaneView(leaf)
+			(leaf: WorkspaceLeaf) => new TradePaneView(leaf, callbacks)
 		);
 
 		this.addCommand({
@@ -250,6 +256,17 @@ export default class AceTradingPlugin extends Plugin {
 		);
 		this.registerEvent(
 			this.app.metadataCache.on('changed', (file) => {
+				const leaf = this.getTradePaneLeaf(false);
+				if (!leaf) return;
+				const view = leaf.view;
+				if (view instanceof TradePaneView && view.getFile()?.path === file.path) {
+					view.setFile(file);
+				}
+			})
+		);
+		this.registerEvent(
+			this.app.vault.on('modify', (file) => {
+				if (!(file instanceof TFile)) return;
 				const leaf = this.getTradePaneLeaf(false);
 				if (!leaf) return;
 				const view = leaf.view;
@@ -379,7 +396,37 @@ export default class AceTradingPlugin extends Plugin {
 	async addFill() {
 		const file = await pickOpenTrade(this.app, this.settings.tradesRoot);
 		if (!file) return;
-		const page = this.app.metadataCache.getFileCache(file); const action = String(page?.frontmatter?.action || 'long').toLowerCase() as Action; const dir = action === 'short' ? -1 : 1;
+		this.openAddFillModal(file);
+	}
+
+	async closeTrade() {
+		const file = await pickOpenTrade(this.app, this.settings.tradesRoot); if (!file) return;
+		this.openCloseTradeModal(file);
+	}
+
+	async recomputeOne() { const file = await pickTrade(this.app, this.settings.tradesRoot); if (!file) return; await this.recomputeTrade(file, true); }
+
+	async bulkRecompute() {
+		const root = this.settings.tradesRoot; const year = new Date().getUTCFullYear(); const def = `${root}/${year}`;
+		const picker = new FolderPicker(this.app, root);
+		picker.onChoose = async (folder: TFolder) => {
+			const folderPath = folder?.path || def;
+			const files = this.app.vault.getMarkdownFiles().filter(f => f.path.startsWith(folderPath) && f.basename.startsWith('T-'));
+			let updated = 0, total = 0; for (const f of files) { total++; const fm = this.app.metadataCache.getFileCache(f)?.frontmatter as Partial<TradeFrontmatter> | undefined; if (fm?.schema_version !== 2 || !Array.isArray(fm?.fills) || !fm?.fills?.length) continue; await this.recomputeTrade(f, false); updated++; }
+			new Notice(`Recomputed metrics: ${updated}/${total} in ${folderPath}`);
+		};
+		picker.open();
+	}
+
+	private openAddFillModal(file: TFile): void {
+		const page = this.app.metadataCache.getFileCache(file);
+		const fm = page?.frontmatter as Partial<TradeFrontmatter> | undefined;
+		if (fm?.closed_at) {
+			new Notice('Trade is already closed.');
+			return;
+		}
+		const action = String(fm?.action || 'long').toLowerCase() as Action;
+		const dir = action === 'short' ? -1 : 1;
 		const fields = [
 			{ id: 'side', label: 'Side (in/out)', default: 'in' },
 			{ id: 'amount', label: 'Amount (base units)' },
@@ -395,19 +442,19 @@ export default class AceTradingPlugin extends Plugin {
 				const exp = expectedQuoteSign(dir, side); const quote = Math.abs(q) * exp; if (Math.sign(q) !== exp) new Notice(`Adjusted quote: ${q} -> ${quote}`);
 				const when = toUtcDateFromInput(vals.time || '', new Date())!;
 				const fill = buildFill({ dir, side, amount: amt, quote, when, note: vals.note || '' });
-				await this.app.fileManager.processFrontMatter(file, (fm: any) => { if (!Array.isArray(fm.fills)) fm.fills = []; fm.fills.push(fill); });
+				await this.app.fileManager.processFrontMatter(file, (frontmatter: any) => { if (!Array.isArray(frontmatter.fills)) frontmatter.fills = []; frontmatter.fills.push(fill); });
 				await this.persistMetrics(file);
+				this.syncTradePane();
 				new Notice(`Added fill to ${file.basename}`);
 			} catch (e) { console.error(e); new Notice('Failed to add fill'); }
 		}).open();
 	}
 
-	async closeTrade() {
-		const file = await pickOpenTrade(this.app, this.settings.tradesRoot); if (!file) return;
+	private openCloseTradeModal(file: TFile): void {
 		const page = this.app.metadataCache.getFileCache(file); const fm = page?.frontmatter as Partial<TradeFrontmatter> | undefined;
 		const fills = Array.isArray(fm?.fills) ? fm!.fills! : [];
 		const pos = fills.reduce((acc, f: any) => acc + (Number(f.base) || 0), 0);
-		if (Math.abs(pos) < 1e-12) return new Notice('Already flat.');
+		if (Math.abs(pos) < 1e-12) { new Notice('Already flat.'); return; }
 
 		const action = String(fm?.action || 'long').toLowerCase() as Action; const dir = action === 'short' ? -1 : 1;
 		const fields = [
@@ -432,23 +479,16 @@ export default class AceTradingPlugin extends Plugin {
 					await this.app.fileManager.processFrontMatter(file, (fw: any) => { if (!Array.isArray(fw.fills)) fw.fills = []; fw.fills.push(fill); fw.closed_at = toIsoUtc(when); });
 				}
 				await this.persistMetrics(file);
+				this.syncTradePane();
 				new Notice(`Closed ${file.basename}`);
 			} catch (e) { console.error(e); new Notice('Failed to close trade'); }
 		}).open();
 	}
 
-	async recomputeOne() { const file = await pickTrade(this.app, this.settings.tradesRoot); if (!file) return; await this.persistMetrics(file); new Notice(`Recomputed metrics: ${file.basename}`); }
-
-	async bulkRecompute() {
-		const root = this.settings.tradesRoot; const year = new Date().getUTCFullYear(); const def = `${root}/${year}`;
-		const picker = new FolderPicker(this.app, root);
-		picker.onChoose = async (folder: TFolder) => {
-			const folderPath = folder?.path || def;
-			const files = this.app.vault.getMarkdownFiles().filter(f => f.path.startsWith(folderPath) && f.basename.startsWith('T-'));
-			let updated = 0, total = 0; for (const f of files) { total++; const fm = this.app.metadataCache.getFileCache(f)?.frontmatter as Partial<TradeFrontmatter> | undefined; if (fm?.schema_version !== 2 || !Array.isArray(fm?.fills) || !fm?.fills?.length) continue; await this.persistMetrics(f); updated++; }
-			new Notice(`Recomputed metrics: ${updated}/${total} in ${folderPath}`);
-		};
-		picker.open();
+	private async recomputeTrade(file: TFile, notify: boolean): Promise<void> {
+		await this.persistMetrics(file);
+		if (notify) new Notice(`Recomputed metrics: ${file.basename}`);
+		this.syncTradePane();
 	}
 
 	private async persistMetrics(file: TFile) {

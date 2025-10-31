@@ -72,3 +72,7 @@ If your plugin does not need CSS, delete this file.
 	margin-top: auto;
 	gap: var(--size-2-2);
 }
+
+.ace-trade-pane-actions button {
+	width: 100%;
+}

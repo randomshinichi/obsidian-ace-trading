@@ -1,16 +1,24 @@
 import type { TFile } from 'obsidian';
-import { ItemView, WorkspaceLeaf, ButtonComponent, setIcon } from 'obsidian';
+import { ItemView, WorkspaceLeaf, ButtonComponent } from 'obsidian';
 import type { TradeFrontmatter, Fill } from './schema';
 import { computeMetrics } from './helpers';
 
 export const VIEW_TYPE_TRADE = 'ace-trade-pane';
 
+export interface TradePaneCallbacks {
+	recompute(file: TFile): Promise<void>;
+	addFill(file: TFile): void;
+	closeTrade(file: TFile): void;
+}
+
 export class TradePaneView extends ItemView {
 	private currentFile: TFile | null = null;
 	private scrollContainer: HTMLElement | null = null;
+	private readonly callbacks: TradePaneCallbacks;
 
-	constructor(leaf: WorkspaceLeaf) {
+	constructor(leaf: WorkspaceLeaf, callbacks: TradePaneCallbacks) {
 		super(leaf);
+		this.callbacks = callbacks;
 	}
 
 	getViewType(): string {
@@ -38,13 +46,20 @@ export class TradePaneView extends ItemView {
 	}
 
 	setFile(file: TFile | null): void {
-		if (this.currentFile?.path === file?.path) return;
+		if (this.currentFile?.path === file?.path) {
+			this.render();
+			return;
+		}
 		this.currentFile = file;
 		this.render();
 	}
 
 	getFile(): TFile | null {
 		return this.currentFile;
+	}
+
+	refresh(): void {
+		this.render();
 	}
 
 	private render(): void {
@@ -126,15 +141,35 @@ export class TradePaneView extends ItemView {
 
 	private renderActions(el: HTMLElement): void {
 		const section = el.createDiv({ cls: 'ace-trade-pane-section ace-trade-pane-actions' });
+		const current = this.currentFile;
+		const disabled = !current;
+
 		const recompute = new ButtonComponent(section);
 		recompute.setButtonText('Recompute Metrics');
+		recompute.setDisabled(disabled);
 		recompute.onClick(async () => {
 			const file = this.currentFile;
 			if (!file) return;
-			const commands = (this.app as unknown as { commands?: { executeCommandById(id: string): void } }).commands;
-			commands?.executeCommandById('ace-recompute-trade');
+			await this.callbacks.recompute(file);
 		});
-		setIcon(recompute.buttonEl, 'refresh-ccw');
+
+		const addFill = new ButtonComponent(section);
+		addFill.setButtonText('Add Fill');
+		addFill.setDisabled(disabled);
+		addFill.onClick(() => {
+			const file = this.currentFile;
+			if (!file) return;
+			this.callbacks.addFill(file);
+		});
+
+		const closeTrade = new ButtonComponent(section);
+		closeTrade.setButtonText('Close Trade');
+		closeTrade.setDisabled(disabled);
+		closeTrade.onClick(() => {
+			const file = this.currentFile;
+			if (!file) return;
+			this.callbacks.closeTrade(file);
+		});
 	}
 
 	private getFrontmatter(): Partial<TradeFrontmatter> | null {
