@@ -15,7 +15,6 @@ import {
 import {
 	pad,
 	toIsoUtc,
-	toLiteUtc,
 	parseNum,
 	parsePair,
 	ensureFolder,
@@ -24,6 +23,9 @@ import {
 	buildFill,
 	expectedQuoteSign,
 	computeMetrics,
+	formatDateTimeInZone,
+	getAvailableTimeZones,
+	getSystemTimeZone,
 } from './helpers';
 import { Action, Side, TradeFrontmatter, Fill } from './schema';
 import { TradePaneView, VIEW_TYPE_TRADE, TradePaneCallbacks } from './trade-pane';
@@ -120,24 +122,61 @@ class FolderPicker extends SuggestModal<TFolder> {
 	renderSuggestion(value: TFolder, el: HTMLElement) { el.setText(value.path); }
 	onChooseSuggestion(item: TFolder) { this.onChoose?.(item); }
 }
+type InputField = {
+	id: string;
+	label: string;
+	placeholder?: string;
+	default?: string;
+	type?: 'text' | 'datetime';
+	defaultTimezone?: string;
+};
+
 class InputModal extends Modal {
 	titleStr: string;
-	fields: { id: string; label: string; placeholder?: string; default?: string }[];
+	fields: InputField[];
 	values: Record<string, string> = {};
 	onSubmit: (vals: Record<string, string>) => void;
-	constructor(app: App, title: string, fields: { id: string; label: string; placeholder?: string; default?: string }[], onSubmit: (vals: Record<string, string>) => void) {
-		super(app); this.titleStr = title; this.fields = fields; this.onSubmit = onSubmit;
+	private timeZones: string[];
+	private systemTimeZone: string;
+	constructor(app: App, title: string, fields: InputField[], onSubmit: (vals: Record<string, string>) => void) {
+		super(app);
+		this.titleStr = title;
+		this.fields = fields;
+		this.onSubmit = onSubmit;
+		this.timeZones = getAvailableTimeZones();
+		this.systemTimeZone = getSystemTimeZone();
 	}
 	onOpen() {
 		const { contentEl } = this; contentEl.empty(); contentEl.createEl('h3', { text: this.titleStr });
-		this.fields.forEach(f => new Setting(contentEl).setName(f.label).addText(t => {
-			if (f.placeholder) t.setPlaceholder(f.placeholder);
-			const initial = f.default != null ? String(f.default) : "";
-			t.setValue(initial);
-			this.values[f.id] = initial;    // seed default so OK works without typing
-			t.onChange(v => this.values[f.id] = v);
-		}));
-		new Setting(contentEl).addButton(b => b.setButtonText('Cancel').onClick(() => this.close())).addButton(b => b.setCta().setButtonText('OK').onClick(() => { this.onSubmit(this.values); this.close(); }));
+		this.fields.forEach(f => {
+			const setting = new Setting(contentEl).setName(f.label);
+			const renderText = () => {
+				setting.addText(t => {
+					if (f.placeholder) t.setPlaceholder(f.placeholder);
+					const initial = f.default != null ? String(f.default) : '';
+					t.setValue(initial);
+					this.values[f.id] = initial; // seed default so OK works without typing
+					t.onChange(v => this.values[f.id] = v);
+				});
+			};
+			if (f.type === 'datetime') {
+				const tzDefault = f.defaultTimezone || this.systemTimeZone;
+				this.values[`${f.id}_tz`] = tzDefault;
+				renderText();
+				setting.addDropdown(dropdown => {
+					this.timeZones.forEach(zone => dropdown.addOption(zone, zone));
+					dropdown.selectEl.title = `${f.label} timezone`;
+					dropdown.selectEl.style.width = '220px';
+					dropdown.setValue(tzDefault);
+					dropdown.onChange(value => this.values[`${f.id}_tz`] = value);
+				});
+			} else {
+				renderText();
+			}
+		});
+		new Setting(contentEl)
+			.addButton(b => b.setButtonText('Cancel').onClick(() => this.close()))
+			.addButton(b => b.setCta().setButtonText('OK').onClick(() => { this.onSubmit(this.values); this.close(); }));
 	}
 	onClose() { this.contentEl.empty(); }
 }
@@ -221,6 +260,7 @@ class AceTradingSettingsTab extends PluginSettingTab {
 
 export default class AceTradingPlugin extends Plugin {
 	settings: AceTradingSettings;
+	private lastTradeFile: TFile | null = null;
 
 	async onload() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
@@ -260,6 +300,7 @@ export default class AceTradingPlugin extends Plugin {
 				if (!leaf) return;
 				const view = leaf.view;
 				if (view instanceof TradePaneView && view.getFile()?.path === file.path) {
+					this.lastTradeFile = file;
 					view.setFile(file);
 				}
 			})
@@ -271,6 +312,7 @@ export default class AceTradingPlugin extends Plugin {
 				if (!leaf) return;
 				const view = leaf.view;
 				if (view instanceof TradePaneView && view.getFile()?.path === file.path) {
+					this.lastTradeFile = file;
 					view.setFile(file);
 				}
 			})
@@ -303,24 +345,53 @@ export default class AceTradingPlugin extends Plugin {
 		this.app.workspace.revealLeaf(leaf);
 	}
 
-	private syncTradePane(): void {
+	private syncTradePane(force = false): void {
 		const leaf = this.getTradePaneLeaf(false);
 		if (!leaf) return;
 		const view = leaf.view;
 		if (!(view instanceof TradePaneView)) return;
 
 		const activeFile = this.app.workspace.getActiveFile();
-		if (isTradeFile(activeFile, this.settings.tradesRoot)) {
-			view.setFile(activeFile);
-		} else {
-			view.setFile(null);
+		const current = view.getFile();
+		if (activeFile && isTradeFile(activeFile, this.settings.tradesRoot)) {
+			this.lastTradeFile = activeFile;
+			if (force) {
+				if (!current || current.path !== activeFile.path) view.setFile(activeFile);
+				else view.refresh();
+			} else if (!current || current.path !== activeFile.path) {
+				view.setFile(activeFile);
+			}
+			return;
 		}
+
+		if (activeFile && !isTradeFile(activeFile, this.settings.tradesRoot)) {
+			this.lastTradeFile = null;
+			if (current) view.setFile(null);
+			return;
+		}
+
+		if (this.lastTradeFile) {
+			if (force) {
+				if (!current || current.path !== this.lastTradeFile.path) view.setFile(this.lastTradeFile);
+				else view.refresh();
+			} else if (!current || current.path !== this.lastTradeFile.path) {
+				view.setFile(this.lastTradeFile);
+			}
+			return;
+		}
+
+		if (current) view.setFile(null);
+	}
+
+	private refreshTradePane(): void {
+		this.syncTradePane(true);
 	}
 
 	async newTrade() {
 		const d = new Date();
-		const defaults = { lite: `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} UTC` };
-		const fields = [
+		const systemTimeZone = getSystemTimeZone();
+		const defaults = { lite: formatDateTimeInZone(d, systemTimeZone) };
+		const fields: InputField[] = [
 			{ id: 'pair', label: 'Pair/Base (e.g., HYPE/USDT)' },
 			{ id: 'action', label: 'Action (long/short)', default: 'long' },
 			{ id: 'amount', label: 'Amount (base units)' },
@@ -328,7 +399,7 @@ export default class AceTradingPlugin extends Plugin {
 			{ id: 'tags', label: 'Tags, comma or space separated' },
 			{ id: 'account', label: 'Account/Where' },
 			{ id: 'initial_stop', label: 'Initial stop (price, optional)' },
-			{ id: 'timestamp', label: 'Timestamp (UTC)', default: defaults.lite }
+			{ id: 'timestamp', label: 'Timestamp', default: defaults.lite, type: 'datetime', defaultTimezone: systemTimeZone }
 		];
 		new InputModal(this.app, 'New Trade', fields, async (vals) => {
 			try {
@@ -344,7 +415,7 @@ export default class AceTradingPlugin extends Plugin {
 					.split(/[\s,]+/)
 					.map(tag => tag.replace(/^#/, '').trim())
 					.filter(Boolean);
-				const tradeDate = toUtcDateFromInput(vals.timestamp || '', new Date())!;
+				const tradeDate = toUtcDateFromInput(vals.timestamp || '', new Date(), vals['timestamp_tz'])!;
 				const yyyy = tradeDate.getUTCFullYear(), mm = pad(tradeDate.getUTCMonth() + 1), dd = pad(tradeDate.getUTCDate()), hh = pad(tradeDate.getUTCHours()), mi = pad(tradeDate.getUTCMinutes());
 				const pairFlat = `${coinSym}${quoteSym}`;
 				const fileBasePattern = this.settings.filenamePattern
@@ -427,11 +498,13 @@ export default class AceTradingPlugin extends Plugin {
 		}
 		const action = String(fm?.action || 'long').toLowerCase() as Action;
 		const dir = action === 'short' ? -1 : 1;
-		const fields = [
+		const systemTimeZone = getSystemTimeZone();
+		const defaultTime = formatDateTimeInZone(new Date(), systemTimeZone);
+		const fields: InputField[] = [
 			{ id: 'side', label: 'Side (in/out)', default: 'in' },
 			{ id: 'amount', label: 'Amount (base units)' },
 			{ id: 'quote', label: 'Quote delta (spent<0>/received>0)' },
-			{ id: 'time', label: 'Time (UTC)', default: toLiteUtc(new Date()) },
+			{ id: 'time', label: 'Time', default: defaultTime, type: 'datetime', defaultTimezone: systemTimeZone },
 			{ id: 'note', label: 'Note (optional)' }
 		];
 		new InputModal(this.app, 'Add Fill', fields, async (vals) => {
@@ -440,11 +513,11 @@ export default class AceTradingPlugin extends Plugin {
 				const amt = parseNum(vals.amount); if (!Number.isFinite(amt) || amt <= 0) return new Notice('Amount must be > 0');
 				const q = parseNum(vals.quote); if (!Number.isFinite(q) || q === 0) return new Notice('Quote must be non-zero');
 				const exp = expectedQuoteSign(dir, side); const quote = Math.abs(q) * exp; if (Math.sign(q) !== exp) new Notice(`Adjusted quote: ${q} -> ${quote}`);
-				const when = toUtcDateFromInput(vals.time || '', new Date())!;
+				const when = toUtcDateFromInput(vals.time || '', new Date(), vals['time_tz'])!;
 				const fill = buildFill({ dir, side, amount: amt, quote, when, note: vals.note || '' });
 				await this.app.fileManager.processFrontMatter(file, (frontmatter: any) => { if (!Array.isArray(frontmatter.fills)) frontmatter.fills = []; frontmatter.fills.push(fill); });
 				await this.persistMetrics(file);
-				this.syncTradePane();
+				this.refreshTradePane();
 				new Notice(`Added fill to ${file.basename}`);
 			} catch (e) { console.error(e); new Notice('Failed to add fill'); }
 		}).open();
@@ -457,17 +530,19 @@ export default class AceTradingPlugin extends Plugin {
 		if (Math.abs(pos) < 1e-12) { new Notice('Already flat.'); return; }
 
 		const action = String(fm?.action || 'long').toLowerCase() as Action; const dir = action === 'short' ? -1 : 1;
-		const fields = [
+		const systemTimeZone = getSystemTimeZone();
+		const defaultExitTime = formatDateTimeInZone(new Date(), systemTimeZone);
+		const fields: InputField[] = [
 			{ id: 'mode', label: 'Mode (price/quote)', default: 'price' },
 			{ id: 'price', label: 'Exit price (quote/base, if mode=price)' },
 			{ id: 'quote', label: 'Exit quote delta (received>0/spent<0, if mode=quote)' },
-			{ id: 'time', label: 'Exit time (UTC)', default: toLiteUtc(new Date()) },
+			{ id: 'time', label: 'Exit time', default: defaultExitTime, type: 'datetime', defaultTimezone: systemTimeZone },
 			{ id: 'note', label: 'Note (optional)' }
 		];
 		new InputModal(this.app, 'Close Trade', fields, async (vals) => {
 			try {
 				const mode = (vals.mode || 'price').toLowerCase();
-				const when = toUtcDateFromInput(vals.time || '', new Date())!;
+				const when = toUtcDateFromInput(vals.time || '', new Date(), vals['time_tz'])!;
 				if (mode === 'price') {
 					const p = parseNum(vals.price); if (!Number.isFinite(p) || p <= 0) return new Notice('Price must be > 0');
 					const fill = buildFill({ dir, side: 'out', amount: Math.abs(pos), price: p, when, note: vals.note || '' });
@@ -479,7 +554,7 @@ export default class AceTradingPlugin extends Plugin {
 					await this.app.fileManager.processFrontMatter(file, (fw: any) => { if (!Array.isArray(fw.fills)) fw.fills = []; fw.fills.push(fill); fw.closed_at = toIsoUtc(when); });
 				}
 				await this.persistMetrics(file);
-				this.syncTradePane();
+				this.refreshTradePane();
 				new Notice(`Closed ${file.basename}`);
 			} catch (e) { console.error(e); new Notice('Failed to close trade'); }
 		}).open();
@@ -488,7 +563,7 @@ export default class AceTradingPlugin extends Plugin {
 	private async recomputeTrade(file: TFile, notify: boolean): Promise<void> {
 		await this.persistMetrics(file);
 		if (notify) new Notice(`Recomputed metrics: ${file.basename}`);
-		this.syncTradePane();
+		this.refreshTradePane();
 	}
 
 	private async persistMetrics(file: TFile) {

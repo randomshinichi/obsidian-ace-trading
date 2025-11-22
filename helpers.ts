@@ -30,14 +30,97 @@ export const ensureFolder = async (app: App, path: string) => {
         if (!app.vault.getAbstractFileByPath(accum)) await app.vault.createFolder(accum);
     }
 };
-export const toUtcDateFromInput = (input: string | undefined, fallbackDate: Date | null = null) => {
-    if (!input || !input.trim()) return fallbackDate;
+const tzFormatters = new Map<string, Intl.DateTimeFormat>();
+const getTimeZoneFormatter = (timeZone: string) => {
+    const tz = timeZone || 'UTC';
+    if (tzFormatters.has(tz)) return tzFormatters.get(tz)!;
+    let formatter: Intl.DateTimeFormat;
+    try {
+        formatter = new Intl.DateTimeFormat('en-CA', {
+            timeZone: tz,
+            hour12: false,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+        });
+    } catch {
+        formatter = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'UTC',
+            hour12: false,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+        });
+    }
+    tzFormatters.set(tz, formatter);
+    return formatter;
+};
+const fallbackTimeZones = ['UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Asia/Singapore', 'Asia/Tokyo', 'Australia/Sydney'];
+export const getSystemTimeZone = () => {
+    const formatter = Intl.DateTimeFormat();
+    const opts = typeof formatter.resolvedOptions === 'function' ? formatter.resolvedOptions() : null;
+    return opts?.timeZone || 'UTC';
+};
+export const getAvailableTimeZones = () => {
+    const supported = (Intl as any).supportedValuesOf?.('timeZone') as string[] | undefined;
+    if (Array.isArray(supported) && supported.length) return supported;
+    return fallbackTimeZones;
+};
+const extractParts = (input: string) => {
     const s = input.trim().replace(/\s+UTC$/i, '');
     let m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})$/);
-    if (m) return new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:00Z`);
+    if (m) return { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]), hour: Number(m[4]), minute: Number(m[5]) };
     m = s.match(/^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})$/);
-    if (m) return new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:00Z`);
-    const d = new Date(s);
+    if (m) return { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]), hour: Number(m[4]), minute: Number(m[5]) };
+    return null;
+};
+const buildUtcDateFromParts = (parts: { year: number; month: number; day: number; hour: number; minute: number }) => new Date(Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, 0));
+const zonedPartsToUtc = (parts: { year: number; month: number; day: number; hour: number; minute: number }, timeZone: string) => {
+    const candidate = buildUtcDateFromParts(parts);
+    const formatter = getTimeZoneFormatter(timeZone);
+    const zoned = formatter.formatToParts(candidate).reduce<Record<string, string>>((acc, part) => {
+        if (part.type !== 'literal') acc[part.type] = part.value;
+        return acc;
+    }, {});
+    const zonedDate = new Date(Date.UTC(
+        Number(zoned.year),
+        Number(zoned.month) - 1,
+        Number(zoned.day),
+        Number(zoned.hour),
+        Number(zoned.minute),
+        Number(zoned.second || '0'),
+    ));
+    const diff = candidate.getTime() - zonedDate.getTime();
+    return new Date(candidate.getTime() + diff);
+};
+export const formatDateTimeInZone = (date: Date, timeZone: string) => {
+    const formatter = getTimeZoneFormatter(timeZone);
+    const parts = formatter.formatToParts(date).reduce<Record<string, string>>((acc, part) => {
+        if (part.type !== 'literal') acc[part.type] = part.value;
+        return acc;
+    }, {});
+    const year = parts.year ?? '0000';
+    const month = parts.month ?? '01';
+    const day = parts.day ?? '01';
+    const hour = parts.hour ?? '00';
+    const minute = parts.minute ?? '00';
+    return `${year}-${month}-${day} ${hour}:${minute}`;
+};
+export const toUtcDateFromInput = (input: string | undefined, fallbackDate: Date | null = null, timeZone?: string) => {
+    if (!input || !input.trim()) return fallbackDate;
+    const trimmed = input.trim();
+    const parts = extractParts(trimmed);
+    if (parts) {
+        if (timeZone && timeZone !== 'UTC') return zonedPartsToUtc(parts, timeZone);
+        return buildUtcDateFromParts(parts);
+    }
+    const d = new Date(trimmed.replace(/\s+UTC$/i, ''));
     return isNaN(d.getTime()) ? fallbackDate : d;
 };
 export const isTradeFile = (f: TFile | null, root?: string) => !!(f && f.basename?.startsWith('T-') && (!root || (f.path && f.path.startsWith(root + '/'))));
